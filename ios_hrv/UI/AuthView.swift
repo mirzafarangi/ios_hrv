@@ -2,12 +2,15 @@ import SwiftUI
 
 struct AuthView: View {
     @EnvironmentObject var coreEngine: CoreEngine
+    @StateObject private var authService = SupabaseAuthService.shared
     @State private var email = ""
     @State private var password = ""
     @State private var confirmPassword = ""
     @State private var isSignUpMode = false
     @State private var showingResetPassword = false
     @State private var resetEmail = ""
+    @State private var showingErrorAlert = false
+    @State private var showingSuccessAlert = false
     
     var body: some View {
         NavigationView {
@@ -67,15 +70,28 @@ struct AuthView: View {
                 }
                 .padding(.horizontal, 20)
                 
-                // Error Message
-                // Note: Error handling will be managed through CoreEngine events
-                // TODO: Implement proper error state management through CoreEngine
+                // Error Message Display
+                if let errorMessage = authService.errorMessage {
+                    Text(errorMessage)
+                        .font(.caption)
+                        .foregroundColor(.red)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 20)
+                }
+                
+                // Success Message Display
+                if let successMessage = authService.successMessage {
+                    Text(successMessage)
+                        .font(.caption)
+                        .foregroundColor(.green)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 20)
+                }
                 
                 // Action Button
                 Button(action: handleAuthAction) {
                     HStack {
-                        // Loading state managed by CoreEngine
-                        if false { // Placeholder - will be managed by CoreEngine state
+                        if authService.isLoading {
                             ProgressView()
                                 .scaleEffect(0.8)
                                 .foregroundColor(.white)
@@ -141,15 +157,23 @@ struct AuthView: View {
     }
     
     private func handleAuthAction() {
+        // Clear any previous messages
+        authService.clearMessages()
+        
         Task {
             do {
                 if isSignUpMode {
+                    // Handle sign up through CoreEngine
+                    print("Sign up attempt for: \(email)")
                     try await coreEngine.signUp(email: email, password: password)
                 } else {
+                    // Handle sign in through CoreEngine
+                    print("Sign in attempt for: \(email)")
                     try await coreEngine.signIn(email: email, password: password)
                 }
             } catch {
-                // Error is already handled in AuthService
+                print("Authentication error: \(error)")
+                // Error is already handled by authService.errorMessage
             }
         }
     }

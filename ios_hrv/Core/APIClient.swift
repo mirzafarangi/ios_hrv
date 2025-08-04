@@ -64,16 +64,12 @@ class APIClient {
     // MARK: - Authentication Headers
     
     private func addAuthHeaders(to request: inout URLRequest) async {
-        do {
-            // Get Supabase access token
-            if let accessToken = try await SupabaseAuthService.shared.getAccessToken() {
-                request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
-                print("🔐 Added Supabase auth header to request")
-            } else {
-                print("⚠️ No Supabase access token available")
-            }
-        } catch {
-            print("❌ Failed to get Supabase access token: \(error.localizedDescription)")
+        // Get Supabase access token
+        if let accessToken = await SupabaseAuthService.shared.getCurrentAccessToken() {
+            request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+            print("Added Supabase auth header to request")
+        } else {
+            print("No Supabase access token available")
         }
     }
     

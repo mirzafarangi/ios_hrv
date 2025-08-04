@@ -47,7 +47,18 @@ struct SessionsTabView: View {
                         .background(Color.black.opacity(0.3))
                 }
             }
-            .alert("Database Error", isPresented: .constant(databaseSessionManager.errorMessage != nil)) {
+            .alert("Authentication Required", isPresented: .constant(databaseSessionManager.errorMessage?.contains("Authentication required") == true || databaseSessionManager.errorMessage?.contains("JWT expired") == true)) {
+                Button("Go to Profile") {
+                    databaseSessionManager.errorMessage = nil
+                    // User can sign in again from Profile tab
+                }
+                Button("Cancel") {
+                    databaseSessionManager.errorMessage = nil
+                }
+            } message: {
+                Text("Your session has expired. Please sign in again from the Profile tab.")
+            }
+            .alert("Database Error", isPresented: .constant(databaseSessionManager.errorMessage != nil && !databaseSessionManager.errorMessage!.contains("Authentication required") && !databaseSessionManager.errorMessage!.contains("JWT expired"))) {
                 Button("OK") {
                     databaseSessionManager.errorMessage = nil
                 }

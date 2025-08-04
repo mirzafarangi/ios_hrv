@@ -3,6 +3,8 @@ import SwiftUI
 struct ProfileTabView: View {
     @StateObject private var authService = SupabaseAuthService.shared
     @State private var showingSignOutAlert = false
+    @State private var showingErrorAlert = false
+    @State private var showingSuccessAlert = false
     
     var body: some View {
         NavigationView {
@@ -143,13 +145,39 @@ struct ProfileTabView: View {
                 Task {
                     do {
                         try await authService.signOut()
+                        showingSuccessAlert = true
                     } catch {
-                        print("❌ Sign out error: \(error.localizedDescription)")
+                        print("Sign out error: \(error)")
+                        showingErrorAlert = true
                     }
                 }
             }
         } message: {
             Text("Are you sure you want to sign out?")
+        }
+        .alert("Error", isPresented: $showingErrorAlert) {
+            Button("OK") {
+                authService.clearMessages()
+            }
+        } message: {
+            Text(authService.errorMessage ?? "An error occurred")
+        }
+        .alert("Success", isPresented: $showingSuccessAlert) {
+            Button("OK") {
+                authService.clearMessages()
+            }
+        } message: {
+            Text(authService.successMessage ?? "Operation completed successfully")
+        }
+        .onChange(of: authService.errorMessage) {
+            if authService.errorMessage != nil {
+                showingErrorAlert = true
+            }
+        }
+        .onChange(of: authService.successMessage) {
+            if authService.successMessage != nil {
+                showingSuccessAlert = true
+            }
         }
     }
     

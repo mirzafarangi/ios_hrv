@@ -8,11 +8,12 @@ import Foundation
 
 // MARK: - Session Tag
 enum SessionTag: String, CaseIterable, Codable {
-    case rest = "rest"
     case sleep = "sleep"
+    case rest = "rest"
     case experimentPairedPre = "experiment_paired_pre"
     case experimentPairedPost = "experiment_paired_post"
-    case experimentalDuration = "experimental_duration"
+    case experimentDuration = "experiment_duration"
+    case breathWorkout = "breath_workout"
     
     var displayName: String {
         switch self {
@@ -24,8 +25,10 @@ enum SessionTag: String, CaseIterable, Codable {
             return "Experiment Paired Pre"
         case .experimentPairedPost:
             return "Experiment Paired Post"
-        case .experimentalDuration:
-            return "Experimental Duration"
+        case .experimentDuration:
+            return "Experiment Duration"
+        case .breathWorkout:
+            return "Breath Workout"
         }
     }
     
@@ -39,8 +42,10 @@ enum SessionTag: String, CaseIterable, Codable {
             return "flask.fill"
         case .experimentPairedPost:
             return "checkmark.circle.fill"
-        case .experimentalDuration:
+        case .experimentDuration:
             return "timer.circle.fill"
+        case .breathWorkout:
+            return "lungs.fill"
         }
     }
     
@@ -54,8 +59,10 @@ enum SessionTag: String, CaseIterable, Codable {
             return "Pre-experiment baseline measurement"
         case .experimentPairedPost:
             return "Post-experiment measurement"
-        case .experimentalDuration:
+        case .experimentDuration:
             return "Extended experimental measurement"
+        case .breathWorkout:
+            return "Breathing exercise HRV measurement"
         }
     }
     
@@ -76,8 +83,10 @@ enum SessionTag: String, CaseIterable, Codable {
             return 7  // Per interval
         case .experimentPairedPre, .experimentPairedPost:
             return 5
-        case .experimentalDuration:
+        case .experimentDuration:
             return 15
+        case .breathWorkout:
+            return 10
         }
     }
     
