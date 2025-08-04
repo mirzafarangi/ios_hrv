@@ -1,69 +1,133 @@
 /**
  * SessionsTabView.swift
- * Clean, Direct Database Sessions Tab for HRV iOS App
- * Shows all session data in cards + debug diagnostics
- * No API complexity - Direct Supabase PostgreSQL access
+ * Professional Expandable Accordion Sessions Tab
+ * Scientific approach with scalable tag-based organization
+ * Direct Supabase PostgreSQL access with comprehensive session management
  */
 
 import SwiftUI
 
 struct SessionsTabView: View {
-    @EnvironmentObject var coreEngine: CoreEngine
     @StateObject private var databaseSessionManager = DatabaseSessionManager()
+    @EnvironmentObject var coreEngine: CoreEngine
+    
+    @State private var totalSessionCount: Int = 0
+    @State private var sessionsByTag: [String: [DatabaseSession]] = [:]
+    @State private var expandedSections: Set<String> = []
+    @State private var isLoadingData = false
     
     var body: some View {
         NavigationView {
-            ScrollView {
-                VStack(spacing: 16) {
-                    // Debug & Diagnostics Card
-                    DebugDiagnosticsCard(manager: databaseSessionManager)
-                    
-                    // Sessions Cards
-                    if databaseSessionManager.sessions.isEmpty && !databaseSessionManager.isLoading {
-                        EmptySessionsCard()
-                    } else {
-                        ForEach(databaseSessionManager.sessions) { session in
-                            SessionDataCard(session: session)
+            VStack {
+                if isLoadingData {
+                    ProgressView("Loading session data...")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    ScrollView {
+                        LazyVStack(spacing: 16) {
+                            // Debug & Diagnostics Card - Shows true total count
+                            SessionDiagnosticsCard(
+                                totalCount: totalSessionCount,
+                                debugInfo: databaseSessionManager.debugInfo
+                            )
+                            
+                            // Expandable Accordion for Sessions by Tag
+                            SessionAccordionView(
+                                sessionsByTag: sessionsByTag,
+                                expandedSections: $expandedSections,
+                                onDelete: handleSessionDeletion
+                            )
+                            
+                            // Latest Session Detail Card (if available)
+                            if let latestSession = getLatestSession() {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text("Latest Session Details")
+                                        .font(.headline)
+                                        .foregroundColor(.primary)
+                                    
+                                    SessionDataCard(
+                                        session: latestSession,
+                                        onDelete: { sessionId in
+                                            handleSessionDeletion(sessionId: sessionId)
+                                        }
+                                    )
+                                }
+                                .padding()
+                                .background(Color(.systemBackground))
+                                .cornerRadius(12)
+                                .shadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: 1)
+                            }
                         }
+                        .padding()
+                    }
+                    .refreshable {
+                        await loadAllSessionData()
                     }
                 }
-                .padding()
             }
             .navigationTitle("Sessions")
-            .refreshable {
-                if let userId = coreEngine.userId {
-                    databaseSessionManager.refreshSessions(for: userId)
-                }
-            }
             .onAppear {
-                if let userId = coreEngine.userId {
-                    databaseSessionManager.loadSessions(for: userId)
+                Task {
+                    await loadAllSessionData()
                 }
             }
-            .overlay {
-                if databaseSessionManager.isLoading {
-                    ProgressView("Loading from database...")
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .background(Color.black.opacity(0.3))
-                }
-            }
-            .alert("Authentication Required", isPresented: .constant(databaseSessionManager.errorMessage?.contains("Authentication required") == true || databaseSessionManager.errorMessage?.contains("JWT expired") == true)) {
-                Button("Go to Profile") {
-                    databaseSessionManager.errorMessage = nil
-                    // User can sign in again from Profile tab
-                }
-                Button("Cancel") {
-                    databaseSessionManager.errorMessage = nil
-                }
-            } message: {
-                Text("Your session has expired. Please sign in again from the Profile tab.")
-            }
-            .alert("Database Error", isPresented: .constant(databaseSessionManager.errorMessage != nil && !databaseSessionManager.errorMessage!.contains("Authentication required") && !databaseSessionManager.errorMessage!.contains("JWT expired"))) {
+            .alert("Database Error", isPresented: .constant(databaseSessionManager.errorMessage != nil)) {
                 Button("OK") {
                     databaseSessionManager.errorMessage = nil
                 }
             } message: {
                 Text(databaseSessionManager.errorMessage ?? "")
+            }
+        }
+    }
+    
+    private func loadAllSessionData() async {
+        guard let userId = coreEngine.userId else { return }
+        
+        isLoadingData = true
+        
+        // Load total count and sessions by tag concurrently
+        async let totalCount = databaseSessionManager.getTotalSessionCount(for: userId)
+        async let sessionsByTagData = databaseSessionManager.getSessionsByTag(for: userId)
+        
+        let (count, sessions) = await (totalCount, sessionsByTagData)
+        
+        await MainActor.run {
+            self.totalSessionCount = count
+            self.sessionsByTag = sessions
+            self.isLoadingData = false
+        }
+    }
+    
+    private func getLatestSession() -> DatabaseSession? {
+        return sessionsByTag.values
+            .flatMap { $0 }
+            .sorted { $0.recordedAt > $1.recordedAt }
+            .first
+    }
+    
+    private func handleSessionDeletion(sessionId: String) {
+        guard let userId = coreEngine.userId else {
+            databaseSessionManager.debugInfo.append("Cannot delete session: No user ID available")
+            return
+        }
+        
+        Task {
+            let result = await databaseSessionManager.deleteSession(sessionId: sessionId, userId: userId)
+            
+            await MainActor.run {
+                switch result {
+                case .success():
+                    databaseSessionManager.debugInfo.append("Session deleted successfully: \(sessionId)")
+                    // Refresh data after deletion
+                    Task {
+                        await loadAllSessionData()
+                    }
+                    
+                case .failure(let error):
+                    databaseSessionManager.debugInfo.append("Session deletion failed: \(error.localizedDescription)")
+                    databaseSessionManager.errorMessage = "Failed to delete session: \(error.localizedDescription)"
+                }
             }
         }
     }

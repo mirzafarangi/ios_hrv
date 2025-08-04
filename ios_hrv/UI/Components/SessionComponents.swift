@@ -9,6 +9,15 @@ import SwiftUI
 // MARK: - Session Data Card
 struct SessionDataCard: View {
     let session: DatabaseSession
+    let onDelete: ((String) -> Void)?
+    
+    @State private var isDeleting = false
+    @State private var deleteError: String?
+    
+    init(session: DatabaseSession, onDelete: ((String) -> Void)? = nil) {
+        self.session = session
+        self.onDelete = onDelete
+    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -20,12 +29,38 @@ struct SessionDataCard: View {
                 
                 Spacer()
                 
-                Text("\(session.statusEmoji) \(session.status)")
-                    .font(.caption)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Color.secondary.opacity(0.2))
-                    .cornerRadius(8)
+                if isDeleting {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                        Text("Deleting...")
+                            .font(.caption)
+                            .foregroundColor(.orange)
+                    }
+                } else {
+                    HStack(spacing: 8) {
+                        Text("\(session.statusEmoji) \(session.status)")
+                            .font(.caption)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.secondary.opacity(0.2))
+                            .cornerRadius(8)
+                        
+                        if onDelete != nil {
+                            Button(action: {
+                                deleteSession()
+                            }) {
+                                Image(systemName: "trash")
+                                    .font(.caption)
+                                    .foregroundColor(.red)
+                                    .padding(6)
+                                    .background(Color.red.opacity(0.1))
+                                    .cornerRadius(6)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                        }
+                    }
+                }
             }
             
             // Session Info
@@ -146,6 +181,21 @@ struct SessionDataCard: View {
         .background(Color(.systemBackground))
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: 1)
+        .alert("Delete Failed", isPresented: .constant(deleteError != nil)) {
+            Button("OK") { deleteError = nil }
+        } message: {
+            Text(deleteError ?? "")
+        }
+    }
+    
+    private func deleteSession() {
+        guard let onDelete = onDelete else { return }
+        
+        isDeleting = true
+        deleteError = nil
+        
+        // Call the delete handler
+        onDelete(session.sessionId)
     }
 }
 
@@ -308,5 +358,208 @@ struct EmptySessionsCard: View {
         .background(Color(.systemBackground))
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: 1)
+    }
+}
+
+// MARK: - Session Diagnostics Card
+struct SessionDiagnosticsCard: View {
+    let totalCount: Int
+    let debugInfo: [String]
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Database Diagnostics")
+                .font(.headline)
+                .foregroundColor(.primary)
+            
+            HStack {
+                Text("Total Sessions:")
+                    .font(.body)
+                    .foregroundColor(.secondary)
+                
+                Spacer()
+                
+                Text("\(totalCount)")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.primary)
+            }
+            
+            if !debugInfo.isEmpty {
+                Divider()
+                
+                Text("Recent Operations")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundColor(.secondary)
+                
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 4) {
+                        ForEach(debugInfo.suffix(5), id: \.self) { info in
+                            Text(info)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .lineLimit(2)
+                        }
+                    }
+                }
+                .frame(maxHeight: 100)
+            }
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+        .shadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: 1)
+    }
+}
+
+// MARK: - Session Accordion View
+struct SessionAccordionView: View {
+    let sessionsByTag: [String: [DatabaseSession]]
+    @Binding var expandedSections: Set<String>
+    let onDelete: (String) -> Void
+    
+    var sortedTags: [String] {
+        sessionsByTag.keys.sorted()
+    }
+    
+    var body: some View {
+        if sessionsByTag.isEmpty {
+            EmptySessionsCard()
+        } else {
+            List {
+                ForEach(sortedTags, id: \.self) { tag in
+                    Section {
+                        if expandedSections.contains(tag) {
+                            ForEach(sessionsByTag[tag] ?? []) { session in
+                                SessionRowView(
+                                    session: session,
+                                    onDelete: onDelete
+                                )
+                            }
+                        }
+                    } header: {
+                        SessionTagHeader(
+                            tag: tag,
+                            sessionCount: sessionsByTag[tag]?.count ?? 0,
+                            isExpanded: expandedSections.contains(tag),
+                            onToggle: {
+                                withAnimation(.easeInOut(duration: 0.3)) {
+                                    if expandedSections.contains(tag) {
+                                        expandedSections.remove(tag)
+                                    } else {
+                                        expandedSections.insert(tag)
+                                    }
+                                }
+                            }
+                        )
+                    }
+                }
+            }
+            .listStyle(.plain)
+        }
+    }
+}
+
+// MARK: - Session Tag Header
+struct SessionTagHeader: View {
+    let tag: String
+    let sessionCount: Int
+    let isExpanded: Bool
+    let onToggle: () -> Void
+    
+    private var tagDisplayName: String {
+        switch tag {
+        case "sleep": return "Sleep"
+        case "rest": return "Rest"
+        case "experiment_paired_pre": return "Experiment Pre"
+        case "experiment_paired_post": return "Experiment Post"
+        case "experiment_duration": return "Experiment Duration"
+        case "breath_workout": return "Breath Workout"
+        default: return tag.capitalized
+        }
+    }
+    
+    var body: some View {
+        Button(action: onToggle) {
+            HStack {
+                Text(tagDisplayName)
+                    .font(.headline)
+                    .foregroundColor(.primary)
+                
+                Spacer()
+                
+                Text("\(sessionCount)")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.secondary.opacity(0.2))
+                    .cornerRadius(8)
+                
+                Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+            .padding(.vertical, 8)
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+}
+
+// MARK: - Session Row View
+struct SessionRowView: View {
+    let session: DatabaseSession
+    let onDelete: (String) -> Void
+    
+    private var dateFormatter: DateFormatter {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .short
+        formatter.timeStyle = .short
+        return formatter
+    }
+    
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(dateFormatter.string(from: session.recordedAt))
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundColor(.primary)
+                
+                HStack(spacing: 12) {
+                    Text("\(session.durationMinutes) min")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
+                    Text(session.status.capitalized)
+                        .font(.caption)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(session.status == "completed" ? Color.green.opacity(0.2) : Color.orange.opacity(0.2))
+                        .cornerRadius(4)
+                    
+                    if let meanHr = session.meanHr {
+                        Text("\(Int(meanHr)) BPM")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+            
+            Spacer()
+            
+            if session.hasHrvMetrics {
+                Image(systemName: "chart.line.uptrend.xyaxis")
+                    .font(.caption)
+                    .foregroundColor(.green)
+            }
+        }
+        .padding(.vertical, 8)
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+            Button("Delete", role: .destructive) {
+                onDelete(session.sessionId)
+            }
+        }
     }
 }

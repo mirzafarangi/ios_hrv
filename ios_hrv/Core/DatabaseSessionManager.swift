@@ -21,10 +21,10 @@ class DatabaseSessionManager: ObservableObject {
     
     // MARK: - Core Functions
     
-    func loadSessions(for userId: String) {
+    func loadSessions(for userId: String, limit: Int = 13) {
         isLoading = true
         errorMessage = nil
-        debugInfo = ["🔄 Starting Supabase Swift SDK session load for user: \(userId)"]
+        debugInfo = ["🔄 Starting Supabase Swift SDK session load for user: \(userId) (limit: \(limit))"]
         
         Task {
             do {
@@ -91,6 +91,7 @@ class DatabaseSessionManager: ObservableObject {
                     """)
                     .eq("user_id", value: userId)
                     .order("recorded_at", ascending: false)
+                    .limit(limit)
                     .execute()
                     .value
                 
@@ -154,6 +155,169 @@ class DatabaseSessionManager: ObservableObject {
     func refreshSessions(for userId: String) {
         debugInfo.append("🔄 Manual refresh triggered")
         loadSessions(for: userId)
+    }
+    
+    func getTotalSessionCount(for userId: String) async -> Int {
+        do {
+            let authService = SupabaseAuthService.shared
+            guard let userToken = await authService.getCurrentAccessToken() else {
+                await MainActor.run {
+                    self.debugInfo.append("Authentication required for session count")
+                }
+                return 0
+            }
+            
+            let authenticatedClient = PostgrestClient(
+                url: URL(string: "\(SupabaseConfig.url)/rest/v1")!,
+                schema: "public",
+                headers: [
+                    "apikey": SupabaseConfig.anonKey,
+                    "Authorization": "Bearer \(userToken)",
+                    "Content-Type": "application/json",
+                    "Prefer": "count=exact"
+                ],
+                logger: nil
+            )
+            
+            // Use count query instead of selecting all records
+            let response = try await authenticatedClient
+                .from("sessions")
+                .select("*", head: true, count: .exact)
+                .eq("user_id", value: userId)
+                .execute()
+            
+            let count = response.count ?? 0
+            
+            await MainActor.run {
+                self.debugInfo.append("Total session count retrieved: \(count)")
+            }
+            
+            return count
+            
+        } catch {
+            await MainActor.run {
+                self.debugInfo.append("Error getting session count: \(error.localizedDescription)")
+            }
+            return 0
+        }
+    }
+    
+    func getSessionsByTag(for userId: String) async -> [String: [DatabaseSession]] {
+        do {
+            let authService = SupabaseAuthService.shared
+            guard let userToken = await authService.getCurrentAccessToken() else {
+                await MainActor.run {
+                    self.debugInfo.append("Authentication required for sessions by tag")
+                }
+                return [:]
+            }
+            
+            let authenticatedClient = PostgrestClient(
+                url: URL(string: "\(SupabaseConfig.url)/rest/v1")!,
+                schema: "public",
+                headers: [
+                    "apikey": SupabaseConfig.anonKey,
+                    "Authorization": "Bearer \(userToken)",
+                    "Content-Type": "application/json"
+                ],
+                logger: nil
+            )
+            
+            let response: [DatabaseSession] = try await authenticatedClient
+                .from("sessions")
+                .select("""
+                    session_id,
+                    user_id,
+                    tag,
+                    subtag,
+                    event_id,
+                    duration_minutes,
+                    recorded_at,
+                    rr_count,
+                    status,
+                    processed_at,
+                    mean_hr,
+                    mean_rr,
+                    count_rr,
+                    rmssd,
+                    sdnn,
+                    pnn50,
+                    cv_rr,
+                    defa,
+                    sd2_sd1,
+                    created_at,
+                    updated_at
+                """)
+                .eq("user_id", value: userId)
+                .order("recorded_at", ascending: false)
+                .execute()
+                .value
+            
+            // Group sessions by tag
+            let groupedSessions = Dictionary(grouping: response) { $0.tag }
+            
+            await MainActor.run {
+                self.debugInfo.append("Sessions grouped by tag: \(groupedSessions.keys.sorted())")
+            }
+            
+            return groupedSessions
+            
+        } catch {
+            await MainActor.run {
+                self.debugInfo.append("Error getting sessions by tag: \(error.localizedDescription)")
+            }
+            return [:]
+        }
+    }
+    
+    func deleteSession(sessionId: String, userId: String) async -> Result<Void, Error> {
+        debugInfo.append("🗑️ Starting session deletion: \(sessionId)")
+        
+        do {
+            // Get authenticated user token from SupabaseAuthService
+            let authService = SupabaseAuthService.shared
+            guard let userToken = await authService.getCurrentAccessToken() else {
+                let error = NSError(domain: "DatabaseSessionManager", code: 401, userInfo: [NSLocalizedDescriptionKey: "Authentication required for deletion"])
+                debugInfo.append("❌ Deletion failed: No valid user token")
+                return .failure(error)
+            }
+            
+            debugInfo.append("🔐 Using authenticated token for deletion")
+            
+            // Create authenticated PostgREST client
+            let authenticatedClient = PostgrestClient(
+                url: URL(string: "\(SupabaseConfig.url)/rest/v1")!,
+                schema: "public",
+                headers: [
+                    "apikey": SupabaseConfig.anonKey,
+                    "Authorization": "Bearer \(userToken)",
+                    "Content-Type": "application/json"
+                ],
+                logger: nil
+            )
+            
+            // Delete session from database (RLS will ensure user can only delete their own sessions)
+            try await authenticatedClient
+                .from("sessions")
+                .delete()
+                .eq("session_id", value: sessionId)
+                .eq("user_id", value: userId)
+                .execute()
+            
+            debugInfo.append("✅ Session deleted successfully: \(sessionId)")
+            
+            // Remove session from local array immediately for responsive UI
+            await MainActor.run {
+                self.sessions.removeAll { $0.sessionId == sessionId }
+                self.debugInfo.append("🔄 Local session list updated (removed: \(sessionId))")
+            }
+            
+            return .success(())
+            
+        } catch {
+            debugInfo.append("❌ Session deletion failed: \(error.localizedDescription)")
+            return .failure(error)
+        }
     }
     
     func clearDebugInfo() {
