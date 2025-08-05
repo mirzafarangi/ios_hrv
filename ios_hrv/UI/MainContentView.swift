@@ -22,6 +22,13 @@ struct MainContentView: View {
                             Text("Sessions")
                         }
                     
+                    // Analysis Tab - HRV Data Visualization
+                    VisualizationsTabView()
+                        .tabItem {
+                            Image(systemName: "chart.line.uptrend.xyaxis.circle")
+                            Text("Analysis")
+                        }
+                    
                     // Profile Tab
                     ProfileTabView()
                         .tabItem {

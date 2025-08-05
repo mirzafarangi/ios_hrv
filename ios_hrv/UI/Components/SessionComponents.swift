@@ -370,6 +370,7 @@ struct SessionDiagnosticsCard: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Database Diagnostics")
                 .font(.headline)
+                .fontWeight(.semibold)
                 .foregroundColor(.primary)
             
             HStack {
@@ -380,13 +381,15 @@ struct SessionDiagnosticsCard: View {
                 Spacer()
                 
                 Text("\(totalCount)")
-                    .font(.title2)
-                    .fontWeight(.semibold)
+                    .font(.title)
+                    .fontWeight(.bold)
                     .foregroundColor(.primary)
             }
+            .padding(.vertical, 4)
             
             if !debugInfo.isEmpty {
                 Divider()
+                    .padding(.vertical, 4)
                 
                 Text("Recent Operations")
                     .font(.subheadline)
@@ -394,22 +397,26 @@ struct SessionDiagnosticsCard: View {
                     .foregroundColor(.secondary)
                 
                 ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 4) {
-                        ForEach(debugInfo.suffix(5), id: \.self) { info in
+                    LazyVStack(alignment: .leading, spacing: 6) {
+                        ForEach(Array(debugInfo.suffix(3).enumerated()), id: \.offset) { index, info in
                             Text(info)
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                                 .lineLimit(2)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Color(.systemGray6))
+                                .cornerRadius(6)
                         }
                     }
                 }
-                .frame(maxHeight: 100)
+                .frame(maxHeight: 80)
             }
         }
-        .padding()
+        .padding(16)
         .background(Color(.systemBackground))
         .cornerRadius(12)
-        .shadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: 1)
+        .shadow(color: Color.black.opacity(0.1), radius: 3, x: 0, y: 1)
     }
 }
 
@@ -427,18 +434,10 @@ struct SessionAccordionView: View {
         if sessionsByTag.isEmpty {
             EmptySessionsCard()
         } else {
-            List {
+            VStack(spacing: 12) {
                 ForEach(sortedTags, id: \.self) { tag in
-                    Section {
-                        if expandedSections.contains(tag) {
-                            ForEach(sessionsByTag[tag] ?? []) { session in
-                                SessionRowView(
-                                    session: session,
-                                    onDelete: onDelete
-                                )
-                            }
-                        }
-                    } header: {
+                    VStack(spacing: 0) {
+                        // Section Header
                         SessionTagHeader(
                             tag: tag,
                             sessionCount: sessionsByTag[tag]?.count ?? 0,
@@ -453,10 +452,28 @@ struct SessionAccordionView: View {
                                 }
                             }
                         )
+                        
+                        // Expanded Content with List for swipe actions
+                        if expandedSections.contains(tag) {
+                            List {
+                                ForEach(sessionsByTag[tag] ?? []) { session in
+                                    SessionRowView(
+                                        session: session,
+                                        onDelete: onDelete
+                                    )
+                                }
+                            }
+                            .listStyle(.plain)
+                            .frame(height: CGFloat((sessionsByTag[tag]?.count ?? 0) * 60))
+                            .clipped()
+                            .padding(.top, 4)
+                        }
                     }
+                    .background(Color(.systemBackground))
+                    .cornerRadius(12)
+                    .shadow(color: Color.black.opacity(0.1), radius: 3, x: 0, y: 1)
                 }
             }
-            .listStyle(.plain)
         }
     }
 }
@@ -482,26 +499,30 @@ struct SessionTagHeader: View {
     
     var body: some View {
         Button(action: onToggle) {
-            HStack {
+            HStack(spacing: 12) {
                 Text(tagDisplayName)
                     .font(.headline)
+                    .fontWeight(.semibold)
                     .foregroundColor(.primary)
                 
                 Spacer()
                 
                 Text("\(sessionCount)")
                     .font(.subheadline)
+                    .fontWeight(.medium)
                     .foregroundColor(.secondary)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(Color.secondary.opacity(0.2))
+                    .background(Color.secondary.opacity(0.15))
                     .cornerRadius(8)
                 
                 Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
                     .font(.subheadline)
+                    .fontWeight(.medium)
                     .foregroundColor(.secondary)
             }
-            .padding(.vertical, 8)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
         }
         .buttonStyle(PlainButtonStyle())
     }
@@ -520,11 +541,11 @@ struct SessionRowView: View {
     }
     
     var body: some View {
-        HStack {
+        HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(dateFormatter.string(from: session.recordedAt))
                     .font(.subheadline)
-                    .fontWeight(.medium)
+                    .fontWeight(.semibold)
                     .foregroundColor(.primary)
                 
                 HStack(spacing: 12) {
@@ -534,8 +555,9 @@ struct SessionRowView: View {
                     
                     Text(session.status.capitalized)
                         .font(.caption)
+                        .fontWeight(.medium)
                         .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
+                        .padding(.vertical, 3)
                         .background(session.status == "completed" ? Color.green.opacity(0.2) : Color.orange.opacity(0.2))
                         .cornerRadius(4)
                     
@@ -551,11 +573,12 @@ struct SessionRowView: View {
             
             if session.hasHrvMetrics {
                 Image(systemName: "chart.line.uptrend.xyaxis")
-                    .font(.caption)
+                    .font(.subheadline)
                     .foregroundColor(.green)
             }
         }
-        .padding(.vertical, 8)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
             Button("Delete", role: .destructive) {
                 onDelete(session.sessionId)

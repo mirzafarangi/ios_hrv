@@ -24,7 +24,7 @@ struct SessionsTabView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     ScrollView {
-                        LazyVStack(spacing: 16) {
+                        LazyVStack(spacing: 24) {
                             // Debug & Diagnostics Card - Shows true total count
                             SessionDiagnosticsCard(
                                 totalCount: totalSessionCount,
@@ -40,10 +40,12 @@ struct SessionsTabView: View {
                             
                             // Latest Session Detail Card (if available)
                             if let latestSession = getLatestSession() {
-                                VStack(alignment: .leading, spacing: 8) {
+                                VStack(alignment: .leading, spacing: 12) {
                                     Text("Latest Session Details")
-                                        .font(.headline)
+                                        .font(.title2)
+                                        .fontWeight(.semibold)
                                         .foregroundColor(.primary)
+                                        .padding(.horizontal, 20)
                                     
                                     SessionDataCard(
                                         session: latestSession,
@@ -52,13 +54,11 @@ struct SessionsTabView: View {
                                         }
                                     )
                                 }
-                                .padding()
-                                .background(Color(.systemBackground))
-                                .cornerRadius(12)
-                                .shadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: 1)
+                                .padding(.top, 8)
                             }
                         }
-                        .padding()
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 16)
                     }
                     .refreshable {
                         await loadAllSessionData()
