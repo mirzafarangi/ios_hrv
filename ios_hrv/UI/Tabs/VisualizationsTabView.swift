@@ -2,64 +2,56 @@ import SwiftUI
 
 struct VisualizationsTabView: View {
     @State private var selectedTag = "rest"
+    @StateObject private var plotsManager = DatabaseHRVPlotsManager()
     
-    // Canonical tags from schema.md
-    private let canonicalTags = ["rest", "sleep", "experiment_paired_pre", "experiment_paired_post", "experiment_duration", "breath_workout"]
-    
-    private let tagColors: [String: Color] = [
-        "rest": .blue,
-        "sleep": .purple,
-        "experiment_paired_pre": .green,
-        "experiment_paired_post": .orange,
-        "experiment_duration": .red,
-        "breath_workout": .cyan
-    ]
-    
-    private let tagDisplayNames: [String: String] = [
-        "rest": "Rest",
-        "sleep": "Sleep",
-        "experiment_paired_pre": "Pre-Experiment",
-        "experiment_paired_post": "Post-Experiment",
-        "experiment_duration": "Experiment Duration",
-        "breath_workout": "Breath Workout"
+    // HRV metrics in canonical schema order
+    private let hrvMetrics = [
+        "mean_hr", "mean_rr", "count_rr", "rmssd", 
+        "sdnn", "pnn50", "cv_rr", "defa", "sd2_sd1"
     ]
     
     var body: some View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 20) {
-                    // Tag Selection Card
-                    TagSelectionCard(
+                    // Plot Database Summary
+                    PlotStatisticsSummaryCard(plotsManager: plotsManager)
+                    
+                    // Tag Selection with Plot Counts
+                    TagSelectionWithPlotCounts(
                         selectedTag: $selectedTag,
-                        canonicalTags: canonicalTags,
-                        tagColors: tagColors,
-                        tagDisplayNames: tagDisplayNames
+                        plotsManager: plotsManager
                     )
                     
-                    // API-Generated HRV Metric Trend Cards (All 9 metrics in schema order)
-                    ForEach(HRVMetricConfig.allMetrics, id: \.key) { metricConfig in
-                        APIHRVMetricPlotCard(
-                            metric: metricConfig.key,
-                            displayName: metricConfig.displayName,
-                            unit: metricConfig.unit,
-                            selectedTag: selectedTag,
-                            userId: getCurrentUserId()
+                    // HRV Metric Plot Cards (DB-Backed)
+                    ForEach(hrvMetrics, id: \.self) { metric in
+                        DBHRVMetricPlotCard(
+                            metric: metric,
+                            tag: selectedTag,
+                            plotsManager: plotsManager
                         )
                     }
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
+                .padding()
             }
             .navigationTitle("HRV Analysis")
+            .navigationBarTitleDisplayMode(.large)
+            .refreshable {
+                await plotsManager.loadUserPlots()
+            }
+            .onAppear {
+                Task {
+                    await plotsManager.loadUserPlots()
+                }
+            }
         }
     }
     
     // MARK: - Helper Functions
     
+    // Get current user ID from Supabase auth service
     private func getCurrentUserId() -> String {
-        // Get current user ID from Supabase auth
-        // This should be implemented to get the actual authenticated user ID
-        return "oMeXbIPwTXUU1WRkrLU0mtQOU9r1" // Placeholder - replace with actual auth service
+        return SupabaseAuthService.shared.userId ?? "unknown"
     }
 }
 
