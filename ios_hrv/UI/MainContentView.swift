@@ -29,6 +29,13 @@ struct MainContentView: View {
                             Text("Analysis")
                         }
                     
+                    // Test Tab - Direct Plot Testing
+                    TestTabView()
+                        .tabItem {
+                            Image(systemName: "flask.fill")
+                            Text("Test")
+                        }
+                    
                     // Profile Tab
                     ProfileTabView()
                         .tabItem {

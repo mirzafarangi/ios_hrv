@@ -1,8 +1,9 @@
 import SwiftUI
+import Foundation
 
 struct VisualizationsTabView: View {
     @State private var selectedTag = "rest"
-    @StateObject private var plotsManager = DatabaseHRVPlotsManager()
+    @StateObject private var plotsManager = APIHRVPlotsManager()
     
     // HRV metrics in canonical schema order
     private let hrvMetrics = [
@@ -10,22 +11,69 @@ struct VisualizationsTabView: View {
         "sdnn", "pnn50", "cv_rr", "defa", "sd2_sd1"
     ]
     
+    // Canonical tags
+    private let canonicalTags = ["rest", "sleep", "experiment_paired_pre", "experiment_paired_post", "experiment_duration", "breath_workout"]
+    
+    // Tag display configuration
+    private let tagColors: [String: Color] = [
+        "rest": .blue,
+        "sleep": .purple,
+        "experiment_paired_pre": .green,
+        "experiment_paired_post": .orange,
+        "experiment_duration": .red,
+        "breath_workout": .cyan
+    ]
+    
+    private let tagDisplayNames: [String: String] = [
+        "rest": "Rest",
+        "sleep": "Sleep",
+        "experiment_paired_pre": "Pre-Experiment",
+        "experiment_paired_post": "Post-Experiment",
+        "experiment_duration": "Duration Test",
+        "breath_workout": "Breathing"
+    ]
+    
     var body: some View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 20) {
-                    // Plot Database Summary
-                    PlotStatisticsSummaryCard(plotsManager: plotsManager)
+                    // API Plot Statistics Summary
+                    APIPlotStatisticsSummaryCard(plotsManager: plotsManager)
                     
-                    // Tag Selection with Plot Counts
-                    TagSelectionWithPlotCounts(
+                    // Tag Selection
+                    TagSelectionCard(
                         selectedTag: $selectedTag,
-                        plotsManager: plotsManager
+                        canonicalTags: canonicalTags,
+                        tagColors: tagColors,
+                        tagDisplayNames: tagDisplayNames
                     )
                     
-                    // HRV Metric Plot Cards (DB-Backed)
+                    // Loading Progress
+                    if plotsManager.isLoading {
+                        VStack(spacing: 8) {
+                            ProgressView(value: plotsManager.loadingProgress)
+                                .progressViewStyle(LinearProgressViewStyle())
+                            Text("Loading plots... \(Int(plotsManager.loadingProgress * 100))%")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding()
+                        .background(Color(.systemGray6))
+                        .cornerRadius(8)
+                    }
+                    
+                    // Error Message
+                    if let errorMessage = plotsManager.errorMessage {
+                        Text(errorMessage)
+                            .foregroundColor(.red)
+                            .padding()
+                            .background(Color(.systemGray6))
+                            .cornerRadius(8)
+                    }
+                    
+                    // HRV Metric Plot Cards (API-Backed)
                     ForEach(hrvMetrics, id: \.self) { metric in
-                        DBHRVMetricPlotCard(
+                        APIHRVMetricPlotCard(
                             metric: metric,
                             tag: selectedTag,
                             plotsManager: plotsManager
@@ -37,11 +85,16 @@ struct VisualizationsTabView: View {
             .navigationTitle("HRV Analysis")
             .navigationBarTitleDisplayMode(.large)
             .refreshable {
-                await plotsManager.loadUserPlots()
+                await plotsManager.loadPlotsForTag(selectedTag)
             }
             .onAppear {
                 Task {
-                    await plotsManager.loadUserPlots()
+                    await plotsManager.loadPlotsForTag(selectedTag)
+                }
+            }
+            .onChange(of: selectedTag) {
+                Task {
+                    await plotsManager.loadPlotsForTag(selectedTag)
                 }
             }
         }
