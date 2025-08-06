@@ -6,7 +6,7 @@ struct MainContentView: View {
     var body: some View {
         Group {
             if coreEngine.isAuthenticated {
-                // Main app with tabs
+                // Main app with tabs - Clean fresh start with core functionality only
                 TabView {
                     // Record Tab
                     RecordTabView()
@@ -20,34 +20,6 @@ struct MainContentView: View {
                         .tabItem {
                             Image(systemName: "list.bullet.clipboard.fill")
                             Text("Sessions")
-                        }
-                    
-                    // Rest Tab - Rest Baseline Trends
-                    RestTabView()
-                        .tabItem {
-                            Image(systemName: "figure.walk")
-                            Text("Rest")
-                        }
-                    
-                    // Sleep Tab - Sleep Event & Baseline Trends
-                    SleepTabView()
-                        .tabItem {
-                            Image(systemName: "moon.fill")
-                            Text("Sleep")
-                        }
-                    
-                    // Model Tab - Statistics & Modeling
-                    ModelTabView()
-                        .tabItem {
-                            Image(systemName: "function")
-                            Text("Model")
-                        }
-                    
-                    // Test Tab - API Isolation Testing
-                    TestTabView()
-                        .tabItem {
-                            Image(systemName: "testtube.2")
-                            Text("Test")
                         }
                     
                     // Profile Tab
