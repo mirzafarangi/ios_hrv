@@ -22,18 +22,18 @@ struct MainContentView: View {
                             Text("Sessions")
                         }
                     
-                    // Analysis Tab - HRV Data Visualization
-                    VisualizationsTabView()
+                    // Trends Tab - HRV Plot Visualization
+                    DisplayTabView()
                         .tabItem {
-                            Image(systemName: "chart.line.uptrend.xyaxis.circle")
-                            Text("Analysis")
+                            Image(systemName: "chart.xyaxis.line")
+                            Text("Trends")
                         }
                     
-                    // Test Tab - Direct Plot Testing
-                    TestTabView()
+                    // Model Tab - Statistics & Modeling
+                    ModelTabView()
                         .tabItem {
-                            Image(systemName: "flask.fill")
-                            Text("Test")
+                            Image(systemName: "function")
+                            Text("Model")
                         }
                     
                     // Profile Tab
