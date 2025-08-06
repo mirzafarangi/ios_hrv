@@ -12,7 +12,7 @@ struct SleepTabView: View {
     @State private var isLoadingBaselinePlots = false
     @State private var errorMessage: String?
     @State private var eventSessionCount = 0
-    @State private var baselineEventsCount = 0
+    @State private var baselineSessionCount = 0
     @State private var currentEventTask: URLSessionDataTask?
     @State private var currentBaselineTask: URLSessionDataTask?
     
@@ -33,7 +33,7 @@ struct SleepTabView: View {
                             .font(.largeTitle)
                             .fontWeight(.bold)
                         
-                        Text("Event-Based HRV Trends")
+                        Text("Direct API HRV Trends")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                     }
@@ -49,83 +49,67 @@ struct SleepTabView: View {
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
                         .frame(height: 50)
-                        .background(Color.purple)
+                        .background(Color.blue)
                         .cornerRadius(12)
                     }
                     .disabled(isLoadingEvents)
                     .padding(.horizontal)
                     
-                    // Event Selection Dropdown
-                    if !availableEventIds.isEmpty {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Select Sleep Event:")
-                                .font(.headline)
-                                .foregroundColor(.primary)
-                            
-                            Menu {
-                                ForEach(availableEventIds, id: \.self) { eventId in
-                                    Button("Event \(eventId)") {
-                                        selectedEventId = eventId
-                                    }
-                                }
-                            } label: {
-                                HStack {
-                                    Text(selectedEventId != nil ? "Event \(selectedEventId!)" : "Select Event")
-                                        .foregroundColor(selectedEventId != nil ? .primary : .secondary)
-                                    Spacer()
-                                    Image(systemName: "chevron.down")
-                                        .foregroundColor(.secondary)
-                                }
-                                .padding()
-                                .background(Color(.systemGray6))
-                                .cornerRadius(10)
-                            }
-                        }
-                        .padding(.horizontal)
-                    }
-                    
-                    // Fetch Buttons Section
-                    if selectedEventId != nil {
-                        VStack(spacing: 12) {
-                            // Fetch Event Plots Button
-                            Button(action: fetchEventPlots) {
-                                HStack {
-                                    Image(systemName: "chart.line.uptrend.xyaxis")
-                                    Text("Fetch Event \(selectedEventId!) Trends")
-                                }
-                                .font(.headline)
-                                .foregroundColor(.white)
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 50)
-                                .background(Color.blue)
-                                .cornerRadius(12)
-                            }
-                            .disabled(isLoadingEventPlots)
-                            
-                            // Fetch Baseline Plots Button
-                            Button(action: fetchBaselinePlots) {
-                                HStack {
-                                    Image(systemName: "chart.bar.fill")
-                                    Text("Fetch Sleep Baseline Trends")
-                                }
-                                .font(.headline)
-                                .foregroundColor(.white)
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 50)
-                                .background(Color.indigo)
-                                .cornerRadius(12)
-                            }
-                            .disabled(isLoadingBaselinePlots)
-                        }
-                        .padding(.horizontal)
-                    }
-                    
-                    // Loading States
+                    // Loading indicator for events
                     if isLoadingEvents {
                         ProgressView("Loading sleep events...")
                             .padding()
                     }
                     
+                    // Events List
+                    if !availableEventIds.isEmpty {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Available Sleep Events")
+                                .font(.headline)
+                                .padding(.horizontal)
+                            
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 12) {
+                                    ForEach(availableEventIds, id: \.self) { eventId in
+                                        Button(action: {
+                                            selectedEventId = eventId
+                                            fetchEventPlots(eventId: eventId)
+                                        }) {
+                                            VStack {
+                                                Text("Event \(eventId)")
+                                                    .font(.caption)
+                                                    .fontWeight(.semibold)
+                                            }
+                                            .padding(.vertical, 8)
+                                            .padding(.horizontal, 16)
+                                            .background(selectedEventId == eventId ? Color.blue : Color.gray.opacity(0.2))
+                                            .foregroundColor(selectedEventId == eventId ? .white : .primary)
+                                            .cornerRadius(8)
+                                        }
+                                    }
+                                }
+                                .padding(.horizontal)
+                            }
+                        }
+                    }
+                    
+                    // Fetch Baseline Button
+                    Button(action: fetchSleepBaseline) {
+                        HStack {
+                            Image(systemName: "chart.line.uptrend.xyaxis")
+                            Text("Fetch Sleep Baseline Trends")
+                        }
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 50)
+                        .background(Color.green)
+                        .cornerRadius(12)
+                    }
+                    .disabled(isLoadingBaselinePlots)
+                    .padding(.horizontal)
+                    
+                    // Loading indicators
                     if isLoadingEventPlots {
                         ProgressView("Generating event plots...")
                             .padding()
@@ -146,61 +130,55 @@ struct SleepTabView: View {
                             .padding(.horizontal)
                     }
                     
-                    // Sleep Event Trends Section
+                    // Event Plots Section
                     if !eventPlots.isEmpty {
                         VStack(alignment: .leading, spacing: 16) {
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("Sleep Event Trends")
+                            HStack {
+                                Text("Sleep Event \(selectedEventId ?? 0) Trends")
                                     .font(.title2)
                                     .fontWeight(.semibold)
-                                
-                                if let eventId = selectedEventId {
-                                    Text("Event \(eventId) - \(eventSessionCount) sessions")
-                                        .font(.subheadline)
-                                        .foregroundColor(.secondary)
-                                }
+                                Spacer()
+                                Text("\(eventSessionCount) sessions")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
                             }
                             .padding(.horizontal)
                             
-                            LazyVStack(spacing: 16) {
-                                ForEach(metricsOrder, id: \.self) { metric in
-                                    if let plotResult = eventPlots[metric] {
-                                        HRVPlotCard(
-                                            title: "\(displayMetrics[metric] ?? metric.uppercased()) - Event Trends",
-                                            plotResult: plotResult,
-                                            tag: "sleep_event"
-                                        )
-                                        .padding(.horizontal)
-                                    }
+                            ForEach(metricsOrder, id: \.self) { metric in
+                                if let plotResult = eventPlots[metric] {
+                                    HRVPlotCard(
+                                        title: displayMetrics[metric] ?? metric.uppercased(),
+                                        plotResult: plotResult,
+                                        tag: "sleep-event"
+                                    )
+                                    .padding(.horizontal)
                                 }
                             }
                         }
                     }
                     
-                    // Sleep Baseline Trends Section
+                    // Baseline Plots Section
                     if !baselinePlots.isEmpty {
                         VStack(alignment: .leading, spacing: 16) {
-                            VStack(alignment: .leading, spacing: 8) {
+                            HStack {
                                 Text("Sleep Baseline Trends")
                                     .font(.title2)
                                     .fontWeight(.semibold)
-                                
-                                Text("Averaged across \(baselineEventsCount) sleep events")
-                                    .font(.subheadline)
+                                Spacer()
+                                Text("\(baselineSessionCount) sessions")
+                                    .font(.caption)
                                     .foregroundColor(.secondary)
                             }
                             .padding(.horizontal)
                             
-                            LazyVStack(spacing: 16) {
-                                ForEach(metricsOrder, id: \.self) { metric in
-                                    if let plotResult = baselinePlots[metric] {
-                                        HRVPlotCard(
-                                            title: "\(displayMetrics[metric] ?? metric.uppercased()) - Baseline Trends",
-                                            plotResult: plotResult,
-                                            tag: "sleep_baseline"
-                                        )
-                                        .padding(.horizontal)
-                                    }
+                            ForEach(metricsOrder, id: \.self) { metric in
+                                if let plotResult = baselinePlots[metric] {
+                                    HRVPlotCard(
+                                        title: displayMetrics[metric] ?? metric.uppercased(),
+                                        plotResult: plotResult,
+                                        tag: "sleep-baseline"
+                                    )
+                                    .padding(.horizontal)
                                 }
                             }
                         }
@@ -216,7 +194,28 @@ struct SleepTabView: View {
                 loadSleepEvents()
             }
         }
+        .onDisappear {
+            // Cancel any active requests when leaving tab
+            cancelAllRequests()
+        }
     }
+    
+    // MARK: - Request Management & Cancellation
+    
+    private func cancelAllRequests() {
+        print("🚫 SLEEP: Cancelling all active requests")
+        currentEventTask?.cancel()
+        currentBaselineTask?.cancel()
+        currentEventTask = nil
+        currentBaselineTask = nil
+        
+        // Reset loading states
+        isLoadingEvents = false
+        isLoadingEventPlots = false
+        isLoadingBaselinePlots = false
+    }
+    
+    // MARK: - Direct API Methods Following Rest Tab Pattern
     
     private func loadSleepEvents() {
         guard let userId = coreEngine.userId else {
@@ -224,10 +223,16 @@ struct SleepTabView: View {
             return
         }
         
+        // Cancel any existing request to prevent response mixing
+        currentEventTask?.cancel()
+        
         isLoadingEvents = true
         errorMessage = nil
+        availableEventIds = []
+        selectedEventId = nil
         
-        let urlString = "https://hrv-brain-api-production.up.railway.app/api/v1/sleep/events/\(userId)?limit=7"
+        // Query database directly for available sleep event IDs
+        let urlString = "https://hrv-brain-api-production.up.railway.app/api/v1/sessions/processed/\(userId)"
         
         guard let url = URL(string: urlString) else {
             errorMessage = "Invalid URL"
@@ -235,9 +240,13 @@ struct SleepTabView: View {
             return
         }
         
-        print("🌙 SLEEP: Loading events from: \(urlString)")
+        print("🟢 SLEEP: Loading events from: \(urlString)")
         
-        URLSession.shared.dataTask(with: url) { data, response, error in
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.timeoutInterval = 15.0
+        
+        let task = URLSession.shared.dataTask(with: request) { data, response, error in
             DispatchQueue.main.async {
                 isLoadingEvents = false
                 
@@ -254,29 +263,40 @@ struct SleepTabView: View {
                 do {
                     let jsonResponse = try JSONSerialization.jsonObject(with: data) as? [String: Any]
                     
-                    if let success = jsonResponse?["success"] as? Bool, success {
-                        if let eventIds = jsonResponse?["event_ids"] as? [Int] {
-                            availableEventIds = eventIds
-                            if !eventIds.isEmpty && selectedEventId == nil {
-                                selectedEventId = eventIds.first
-                            }
+                    if let sessions = jsonResponse?["sessions"] as? [[String: Any]] {
+                        // Extract unique event IDs for sleep sessions
+                        let sleepSessions = sessions.filter { session in
+                            return (session["tag"] as? String) == "sleep"
+                        }
+                        
+                        let eventIds = Set(sleepSessions.compactMap { session in
+                            session["event_id"] as? Int
+                        }).filter { $0 > 0 } // Only positive event IDs
+                        
+                        availableEventIds = Array(eventIds).sorted()
+                        
+                        print("🔍 SLEEP: Found \(availableEventIds.count) sleep events: \(availableEventIds)")
+                        
+                        if availableEventIds.isEmpty {
+                            errorMessage = "No sleep events found"
                         }
                     } else {
-                        let errorMsg = jsonResponse?["error"] as? String ?? "Unknown error"
-                        errorMessage = "API error: \(errorMsg)"
+                        errorMessage = "Invalid response format"
                     }
                     
                 } catch {
                     errorMessage = "Failed to parse response: \(error.localizedDescription)"
                 }
             }
-        }.resume()
+        }
+        
+        currentEventTask = task
+        task.resume()
     }
     
-    private func fetchEventPlots() {
-        guard let userId = coreEngine.userId,
-              let eventId = selectedEventId else {
-            errorMessage = "Missing user ID or event ID"
+    private func fetchEventPlots(eventId: Int) {
+        guard let userId = coreEngine.userId else {
+            errorMessage = "No authenticated user found"
             return
         }
         
@@ -296,11 +316,12 @@ struct SleepTabView: View {
             return
         }
         
-        print("🌙 SLEEP: Fetching event plots from: \(urlString)")
+        print("🟢 SLEEP: Fetching event plots from: \(urlString)")
         
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = 30.0  // 30 second timeout for large plot images
         
         // Add request body with metrics array
         let requestBody = ["metrics": ["rmssd", "sdnn"]]
@@ -312,7 +333,7 @@ struct SleepTabView: View {
             return
         }
         
-        URLSession.shared.dataTask(with: request) { data, response, error in
+        let task = URLSession.shared.dataTask(with: request) { data, response, error in
             DispatchQueue.main.async {
                 isLoadingEventPlots = false
                 
@@ -326,23 +347,29 @@ struct SleepTabView: View {
                     return
                 }
                 
-                processPlotResponse(data: data, plotsDict: &eventPlots, sessionCountKey: "sessions_count") { count in
+                processPlotResponse(data: data, plotsDict: &eventPlots) { count in
                     eventSessionCount = count
                 }
             }
-        }.resume()
+        }
+        
+        currentEventTask = task
+        task.resume()
     }
     
-    private func fetchBaselinePlots() {
+    private func fetchSleepBaseline() {
         guard let userId = coreEngine.userId else {
             errorMessage = "No authenticated user found"
             return
         }
         
+        // Cancel any existing request to prevent response mixing
+        currentBaselineTask?.cancel()
+        
         isLoadingBaselinePlots = true
         errorMessage = nil
         baselinePlots = [:]
-        baselineEventsCount = 0
+        baselineSessionCount = 0
         
         let urlString = "https://hrv-brain-api-production.up.railway.app/api/v1/plots/sleep-baseline/\(userId)"
         
@@ -352,11 +379,12 @@ struct SleepTabView: View {
             return
         }
         
-        print("🌙 SLEEP: Fetching baseline plots from: \(urlString)")
+        print("🟢 SLEEP: Fetching baseline plots from: \(urlString)")
         
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = 30.0  // 30 second timeout for large plot images
         
         // Add request body with metrics array
         let requestBody = ["metrics": ["rmssd", "sdnn"]]
@@ -368,7 +396,7 @@ struct SleepTabView: View {
             return
         }
         
-        URLSession.shared.dataTask(with: request) { data, response, error in
+        let task = URLSession.shared.dataTask(with: request) { data, response, error in
             DispatchQueue.main.async {
                 isLoadingBaselinePlots = false
                 
@@ -382,26 +410,35 @@ struct SleepTabView: View {
                     return
                 }
                 
-                processPlotResponse(data: data, plotsDict: &baselinePlots, sessionCountKey: "events_count") { count in
-                    baselineEventsCount = count
+                processPlotResponse(data: data, plotsDict: &baselinePlots) { count in
+                    baselineSessionCount = count
                 }
             }
-        }.resume()
+        }
+        
+        currentBaselineTask = task
+        task.resume()
     }
     
-    private func processPlotResponse(data: Data, plotsDict: inout [String: PlotResult], sessionCountKey: String, countCallback: @escaping (Int) -> Void) {
+    private func processPlotResponse(data: Data, plotsDict: inout [String: PlotResult], sessionCountCallback: @escaping (Int) -> Void) {
         do {
             let jsonResponse = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+            print("🔍 SLEEP: Raw response keys: \(jsonResponse?.keys.sorted() ?? [])")
             
             if let success = jsonResponse?["success"] as? Bool, success {
-                let count = jsonResponse?[sessionCountKey] as? Int ?? 0
-                countCallback(count)
+                let sessionCount = jsonResponse?["sessions_count"] as? Int ?? 0
+                sessionCountCallback(sessionCount)
+                print("🔍 SLEEP: Success=\(success), Sessions=\(sessionCount)")
                 
                 if let plotsData = jsonResponse?["plots"] as? [String: [String: Any]] {
+                    print("🔍 SLEEP: Found plots data with metrics: \(plotsData.keys.sorted())")
                     for (metric, plotData) in plotsData {
-                        if let success = plotData["success"] as? Bool, success,
-                           let plotDataString = plotData["plot_data"] as? String,
-                           !plotDataString.isEmpty {
+                        let plotSuccess = plotData["success"] as? Bool ?? false
+                        let plotDataString = plotData["plot_data"] as? String ?? ""
+                        let plotError = plotData["error"] as? String
+                        print("🔍 SLEEP: \(metric) - success=\(plotSuccess), data_length=\(plotDataString.count), error=\(plotError ?? "none")")
+                        
+                        if plotSuccess && !plotDataString.isEmpty {
                             
                             if let imageData = Data(base64Encoded: plotDataString),
                                let image = UIImage(data: imageData) {

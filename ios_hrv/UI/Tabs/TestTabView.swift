@@ -160,7 +160,7 @@ struct TestTabView: View {
                         
                         if success,
                            let plotsData = jsonResponse?["plots"] as? [String: [String: Any]],
-                           let rmssdData = plotsData["rmssd"] as? [String: Any],
+                           let rmssdData = plotsData["rmssd"],
                            let plotSuccess = rmssdData["success"] as? Bool,
                            let plotDataString = rmssdData["plot_data"] as? String {
                             

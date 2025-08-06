@@ -352,7 +352,7 @@ class SupabaseAuthService: ObservableObject {
         return token
     }
     
-    private func isJWTExpired(_ token: String) -> Bool {
+    func isJWTExpired(_ token: String) -> Bool {
         let parts = token.components(separatedBy: ".")
         guard parts.count == 3 else {
             print("Invalid JWT format")
@@ -410,6 +410,13 @@ class SupabaseAuthService: ObservableObject {
     func clearMessages() {
         errorMessage = nil
         successMessage = nil
+    }
+    
+    // MARK: - Token Access (for HRVAuthenticationManager)
+    
+    /// Get current access token (for token refresh monitoring)
+    func getCurrentAccessToken() -> String? {
+        return accessToken
     }
 }
 

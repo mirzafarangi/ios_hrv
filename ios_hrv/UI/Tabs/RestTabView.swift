@@ -97,6 +97,21 @@ struct RestTabView: View {
             .navigationTitle("Rest")
             .navigationBarTitleDisplayMode(.inline)
         }
+        .onDisappear {
+            // Cancel any active requests when leaving tab
+            cancelAllRequests()
+        }
+    }
+    
+    // MARK: - Request Management & Cancellation
+    
+    private func cancelAllRequests() {
+        print("🚫 REST: Cancelling all active requests")
+        currentTask?.cancel()
+        currentTask = nil
+        
+        // Reset loading states
+        isLoading = false
     }
     
     private func fetchRestBaseline() {
