@@ -13,6 +13,8 @@ struct SleepTabView: View {
     @State private var errorMessage: String?
     @State private var eventSessionCount = 0
     @State private var baselineEventsCount = 0
+    @State private var currentEventTask: URLSessionDataTask?
+    @State private var currentBaselineTask: URLSessionDataTask?
     
     // Metrics to display
     private let metricsOrder = ["rmssd", "sdnn"]
@@ -277,6 +279,9 @@ struct SleepTabView: View {
             errorMessage = "Missing user ID or event ID"
             return
         }
+        
+        // Cancel any existing request to prevent response mixing
+        currentEventTask?.cancel()
         
         isLoadingEventPlots = true
         errorMessage = nil

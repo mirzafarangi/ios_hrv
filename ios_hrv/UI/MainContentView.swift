@@ -43,6 +43,13 @@ struct MainContentView: View {
                             Text("Model")
                         }
                     
+                    // Test Tab - API Isolation Testing
+                    TestTabView()
+                        .tabItem {
+                            Image(systemName: "testtube.2")
+                            Text("Test")
+                        }
+                    
                     // Profile Tab
                     ProfileTabView()
                         .tabItem {

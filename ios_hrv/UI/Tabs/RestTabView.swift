@@ -7,6 +7,7 @@ struct RestTabView: View {
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var sessionCount = 0
+    @State private var currentTask: URLSessionDataTask?
     
     // Metrics to display
     private let metricsOrder = ["rmssd", "sdnn"]
@@ -104,6 +105,9 @@ struct RestTabView: View {
             return
         }
         
+        // Cancel any existing request to prevent response mixing
+        currentTask?.cancel()
+        
         isLoading = true
         errorMessage = nil
         plots = [:]
@@ -134,7 +138,7 @@ struct RestTabView: View {
             return
         }
         
-        URLSession.shared.dataTask(with: request) { data, response, error in
+        let task = URLSession.shared.dataTask(with: request) { data, response, error in
             DispatchQueue.main.async {
                 isLoading = false
                 
@@ -150,15 +154,21 @@ struct RestTabView: View {
                 
                 do {
                     let jsonResponse = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+                    print("🔍 REST: Raw response keys: \(jsonResponse?.keys.sorted() ?? [])")
                     
                     if let success = jsonResponse?["success"] as? Bool, success {
                         sessionCount = jsonResponse?["sessions_count"] as? Int ?? 0
+                        print("🔍 REST: Success=\(success), Sessions=\(sessionCount)")
                         
                         if let plotsData = jsonResponse?["plots"] as? [String: [String: Any]] {
+                            print("🔍 REST: Found plots data with metrics: \(plotsData.keys.sorted())")
                             for (metric, plotData) in plotsData {
-                                if let success = plotData["success"] as? Bool, success,
-                                   let plotDataString = plotData["plot_data"] as? String,
-                                   !plotDataString.isEmpty {
+                                let plotSuccess = plotData["success"] as? Bool ?? false
+                                let plotDataString = plotData["plot_data"] as? String ?? ""
+                                let plotError = plotData["error"] as? String
+                                print("🔍 REST: \(metric) - success=\(plotSuccess), data_length=\(plotDataString.count), error=\(plotError ?? "none")")
+                                
+                                if plotSuccess && !plotDataString.isEmpty {
                                     
                                     if let imageData = Data(base64Encoded: plotDataString),
                                        let image = UIImage(data: imageData) {
@@ -201,7 +211,10 @@ struct RestTabView: View {
                     errorMessage = "Failed to parse response: \(error.localizedDescription)"
                 }
             }
-        }.resume()
+        }
+        
+        currentTask = task
+        task.resume()
     }
 }
 
