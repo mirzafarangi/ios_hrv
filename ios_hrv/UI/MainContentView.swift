@@ -22,11 +22,18 @@ struct MainContentView: View {
                             Text("Sessions")
                         }
                     
-                    // Trends Tab - HRV Plot Visualization
-                    DisplayTabView()
+                    // Rest Tab - Rest Baseline Trends
+                    RestTabView()
                         .tabItem {
-                            Image(systemName: "chart.xyaxis.line")
-                            Text("Trends")
+                            Image(systemName: "figure.walk")
+                            Text("Rest")
+                        }
+                    
+                    // Sleep Tab - Sleep Event & Baseline Trends
+                    SleepTabView()
+                        .tabItem {
+                            Image(systemName: "moon.fill")
+                            Text("Sleep")
                         }
                     
                     // Model Tab - Statistics & Modeling
