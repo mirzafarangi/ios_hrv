@@ -29,6 +29,13 @@ struct MainContentView: View {
                             Text("Charts")
                         }
                     
+                    // Test Tab (Isolated for debugging chronological plotting)
+                    TestTabView()
+                        .tabItem {
+                            Image(systemName: "flask.fill")
+                            Text("Test")
+                        }
+                    
                     // Profile Tab
                     ProfileTabView()
                         .tabItem {
