@@ -167,7 +167,7 @@ struct TestChartView: View {
                     )
                     .foregroundStyle(.blue.opacity(0.7))
                     .lineStyle(StrokeStyle(lineWidth: 2, dash: [8, 4]))
-                    .interpolationMethod(.catmullRom)
+                    .interpolationMethod(.linear)  // Use linear instead of catmullRom to prevent overshooting
                 }
             }
             

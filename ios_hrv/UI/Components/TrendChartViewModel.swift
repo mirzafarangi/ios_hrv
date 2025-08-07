@@ -268,13 +268,13 @@ extension TrendChartViewModel {
         
         // Create mock trend data
         let mockDataPoints = [
-            TrendDataPoint(date: "2025-08-05", rmssd: 42.1),
-            TrendDataPoint(date: "2025-08-06", rmssd: 44.3),
-            TrendDataPoint(date: "2025-08-07", rmssd: 43.8)
+            TrendDataPoint(date: "2025-08-05", timestamp: nil, rmssd: 42.1),
+            TrendDataPoint(date: "2025-08-06", timestamp: nil, rmssd: 44.3),
+            TrendDataPoint(date: "2025-08-07", timestamp: nil, rmssd: 43.8)
         ]
         
         let mockRollingAvg = [
-            TrendDataPoint(date: "2025-08-07", rmssd: 43.4)
+            TrendDataPoint(date: "2025-08-07", timestamp: nil, rmssd: 43.4)
         ]
         
         viewModel.trendData = TrendAnalysisResponse(
