@@ -157,14 +157,17 @@ struct TrendChartView: View {
                config.showRollingAverage,
                !sortedRollingAvg.isEmpty {
                 
-                ForEach(sortedRollingAvg) { point in
+                // Create one continuous line connecting all rolling average points
+                // Use a single LineMark series instead of ForEach to ensure continuity
+                ForEach(0..<sortedRollingAvg.count, id: \.self) { index in
                     LineMark(
-                        x: .value("Date", point.dateValue),
-                        y: .value("Rolling Avg", point.rmssd)
+                        x: .value("Date", sortedRollingAvg[index].dateValue),
+                        y: .value("Rolling Avg", sortedRollingAvg[index].rmssd),
+                        series: .value("Rolling Average", "rolling_avg")  // Group all points in one series
                     )
                     .foregroundStyle(.blue.opacity(0.7))
                     .lineStyle(StrokeStyle(lineWidth: 2, dash: [8, 4]))
-                    .interpolationMethod(.linear)  // Use linear instead of catmullRom to prevent overshooting
+                    .interpolationMethod(.linear)
                 }
             }
             

@@ -155,19 +155,22 @@ struct TestChartView: View {
                     }
             }
             
-            // Layer 2: Rolling Average (LineMark) - Dashed Blue.opacity
+            // Layer 2: Rolling Average (LineMark) - Continuous Dashed Blue Line
             if let config = viewModel.chartConfig,
                config.showRollingAverage,
                !sortedRollingAvg.isEmpty {
                 
-                ForEach(sortedRollingAvg) { point in
+                // Create one continuous line connecting all rolling average points
+                // Use a single LineMark series instead of ForEach to ensure continuity
+                ForEach(0..<sortedRollingAvg.count, id: \.self) { index in
                     LineMark(
-                        x: .value("Timestamp", point.dateValue),
-                        y: .value("Rolling Avg", point.rmssd)
+                        x: .value("Timestamp", sortedRollingAvg[index].dateValue),
+                        y: .value("Rolling Avg", sortedRollingAvg[index].rmssd),
+                        series: .value("Rolling Average", "rolling_avg")  // Group all points in one series
                     )
                     .foregroundStyle(.blue.opacity(0.7))
                     .lineStyle(StrokeStyle(lineWidth: 2, dash: [8, 4]))
-                    .interpolationMethod(.linear)  // Use linear instead of catmullRom to prevent overshooting
+                    .interpolationMethod(.linear)
                 }
             }
             
