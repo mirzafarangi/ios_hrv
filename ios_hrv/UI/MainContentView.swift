@@ -22,11 +22,11 @@ struct MainContentView: View {
                             Text("Sessions")
                         }
                     
-                    // Charts Tab
-                    ChartsTabView()
+                    // Trends Tab
+                    TrendsTabView()
                         .tabItem {
                             Image(systemName: "chart.line.uptrend.xyaxis")
-                            Text("Charts")
+                            Text("Trends")
                         }
                     
                     // Test Tab (Isolated for debugging chronological plotting)

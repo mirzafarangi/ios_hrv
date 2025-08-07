@@ -157,12 +157,13 @@ struct TrendChartView: View {
                config.showRollingAverage,
                !sortedRollingAvg.isEmpty {
                 
-                // Based on Python Plotly solution: create ONE continuous line through all points
-                // SwiftUI Charts: Use ForEach but ensure proper continuous line rendering
+                // CRITICAL FIX: Use series identifier to create ONE continuous line
+                // This matches Python Plotly's single go.Scatter approach
                 ForEach(sortedRollingAvg) { point in
                     LineMark(
                         x: .value("Date", point.dateValue),
-                        y: .value("Rolling Avg", point.rmssd)
+                        y: .value("Rolling Avg", point.rmssd),
+                        series: .value("Series", "rolling_average")
                     )
                     .foregroundStyle(.blue.opacity(0.7))
                     .lineStyle(StrokeStyle(lineWidth: 2, dash: [8, 4]))
