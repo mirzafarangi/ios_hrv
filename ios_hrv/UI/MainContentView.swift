@@ -22,11 +22,11 @@ struct MainContentView: View {
                             Text("Sessions")
                         }
                     
-                    // Trends Tab
-                    TrendsTabView()
+                    // Charts Tab
+                    ChartsTabView()
                         .tabItem {
                             Image(systemName: "chart.line.uptrend.xyaxis")
-                            Text("Trends")
+                            Text("Charts")
                         }
                     
                     // Profile Tab

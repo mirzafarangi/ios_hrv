@@ -12,7 +12,7 @@ import Auth
 struct SupabaseConfig {
     // NEW SUPABASE PROJECT: atriom_hrv_db (Railway-compatible, ROTATED KEYS)
     static let url = "https://hmckwsyksbckxfxuzxca.supabase.co"
-    static let anonKey = "sb_publishable_oRjabmXPVvT5QMv_5Ec92A_Ytc6xrFr"
+    static let anonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhtY2t3c3lrc2Jja3hmeHV6eGNhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQyNTIzOTQsImV4cCI6MjA2OTgyODM5NH0.QuaQEH_MLluSafrnYD5GWDy5pHrBfNprgNq3UpVLAuc"
     
     // PostgREST client for database operations
     static let client = PostgrestClient(
