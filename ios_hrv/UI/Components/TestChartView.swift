@@ -156,17 +156,17 @@ struct TestChartView: View {
             }
             
             // Layer 2: Rolling Average (LineMark) - Continuous Dashed Blue Line
+            // Based on Python Plotly solution: create ONE continuous line through all points
             if let config = viewModel.chartConfig,
                config.showRollingAverage,
                !sortedRollingAvg.isEmpty {
                 
-                // Create one continuous line connecting all rolling average points
-                // Use a single LineMark series instead of ForEach to ensure continuity
-                ForEach(0..<sortedRollingAvg.count, id: \.self) { index in
+                // SwiftUI Charts: Use ForEach but ensure all points share the same series identifier
+                // This creates one continuous line instead of disconnected segments
+                ForEach(sortedRollingAvg) { point in
                     LineMark(
-                        x: .value("Timestamp", sortedRollingAvg[index].dateValue),
-                        y: .value("Rolling Avg", sortedRollingAvg[index].rmssd),
-                        series: .value("Rolling Average", "rolling_avg")  // Group all points in one series
+                        x: .value("Timestamp", point.dateValue),
+                        y: .value("Rolling Avg", point.rmssd)
                     )
                     .foregroundStyle(.blue.opacity(0.7))
                     .lineStyle(StrokeStyle(lineWidth: 2, dash: [8, 4]))
