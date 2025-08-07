@@ -11,9 +11,39 @@ struct TestDataPoint: Codable, Identifiable {
     
     /// Convert timestamp string to Date object for chart rendering
     var dateValue: Date {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter.date(from: timestamp) ?? Date()
+        // Try multiple formatters to handle different timestamp formats
+        let formatters = [
+            // ISO8601 without fractional seconds (most common from API)
+            { () -> ISO8601DateFormatter in
+                let formatter = ISO8601DateFormatter()
+                formatter.formatOptions = [.withInternetDateTime]
+                return formatter
+            }(),
+            // ISO8601 with fractional seconds (fallback)
+            { () -> ISO8601DateFormatter in
+                let formatter = ISO8601DateFormatter()
+                formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+                return formatter
+            }()
+        ]
+        
+        // Try each formatter until one succeeds
+        for formatter in formatters {
+            if let date = formatter.date(from: timestamp) {
+                return date
+            }
+        }
+        
+        // Fallback: try custom DateFormatter for edge cases
+        let customFormatter = DateFormatter()
+        customFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ssZ"
+        if let date = customFormatter.date(from: timestamp) {
+            return date
+        }
+        
+        // Last resort: return current date (should not happen with valid API data)
+        print("⚠️ Failed to parse timestamp: \(timestamp)")
+        return Date()
     }
     
     private enum CodingKeys: String, CodingKey {

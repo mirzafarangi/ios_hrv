@@ -3,21 +3,66 @@ import Foundation
 // MARK: - Trend Analysis Data Models
 // Implements unified JSON response schema from polish_architecture.md
 
-/// Data point for trend analysis (date + RMSSD value)
+/// Single data point for trend analysis - Updated to handle both date and timestamp fields
 struct TrendDataPoint: Codable, Identifiable {
     let id = UUID()
-    let date: String  // YYYY-MM-DD format from API
+    let date: String?  // ISO date format (YYYY-MM-DD) - legacy field
+    let timestamp: String?  // Full ISO timestamp - new field
     let rmssd: Double
     
-    /// Convert date string to Date object for chart rendering
+    /// Convert date/timestamp string to Date object for chart rendering
     var dateValue: Date {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter.date(from: date) ?? Date()
+        // Prefer timestamp over date for better precision
+        let dateString = timestamp ?? date ?? ""
+        
+        // Try multiple formatters to handle different formats
+        let formatters: [(DateFormatter) -> Void] = [
+            // ISO8601 timestamp format (new API format)
+            { formatter in
+                let iso8601 = ISO8601DateFormatter()
+                iso8601.formatOptions = [.withInternetDateTime]
+                if let date = iso8601.date(from: dateString) {
+                    formatter.dateFormat = "" // Not used, but required
+                    // Return the parsed date by setting a property we can access
+                }
+            },
+            // Legacy date-only format
+            { formatter in
+                formatter.dateFormat = "yyyy-MM-dd"
+            }
+        ]
+        
+        // Try ISO8601 first (for timestamp field)
+        if let timestamp = timestamp {
+            let iso8601 = ISO8601DateFormatter()
+            iso8601.formatOptions = [.withInternetDateTime]
+            if let date = iso8601.date(from: timestamp) {
+                return date
+            }
+            
+            // Fallback for timestamp with fractional seconds
+            iso8601.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            if let date = iso8601.date(from: timestamp) {
+                return date
+            }
+        }
+        
+        // Try date-only format (for legacy date field)
+        if let date = date {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd"
+            if let parsedDate = formatter.date(from: date) {
+                return parsedDate
+            }
+        }
+        
+        // Last resort
+        print("⚠️ Failed to parse date/timestamp: date=\(date ?? "nil"), timestamp=\(timestamp ?? "nil")")
+        return Date()
     }
     
     private enum CodingKeys: String, CodingKey {
-        case date, rmssd
+        case date, timestamp, rmssd
     }
 }
 
