@@ -6,7 +6,7 @@ struct MainContentView: View {
     var body: some View {
         Group {
             if coreEngine.isAuthenticated {
-                // Main app with tabs - Clean fresh start with core functionality only
+                // Main app with tabs - Clean fresh start with core functionality + Trends
                 TabView {
                     // Record Tab
                     RecordTabView()
@@ -20,6 +20,13 @@ struct MainContentView: View {
                         .tabItem {
                             Image(systemName: "list.bullet.clipboard.fill")
                             Text("Sessions")
+                        }
+                    
+                    // Trends Tab
+                    TrendsTabView()
+                        .tabItem {
+                            Image(systemName: "chart.line.uptrend.xyaxis")
+                            Text("Trends")
                         }
                     
                     // Profile Tab
