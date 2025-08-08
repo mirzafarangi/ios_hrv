@@ -72,6 +72,16 @@ struct SDBand: Codable {
     let lower: Double
 }
 
+/// Summary statistics for a trend
+struct TrendStats: Codable, Equatable {
+    let mean: Double
+    let min: Double
+    let max: Double
+    let baseline: Double?
+    let count: Int
+    let unit: String
+}
+
 /// Complete trend analysis response matching API unified JSON schema
 struct TrendAnalysisResponse: Codable {
     let raw: [TrendDataPoint]

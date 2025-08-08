@@ -5,11 +5,13 @@ import SwiftUI
 /// Integrates all visualization lessons from Test tab success
 struct TrendsTabView: View {
     
-    // MARK: - State
+    // MARK: - Properties
     
-    @StateObject private var viewModel = TestChartViewModel()
-    @State private var selectedTrendMode: TrendMode = .rest
     @State private var selectedMetric: HRVMetric = .rmssd
+    @State private var selectedTrendMode: TrendMode = .rest
+    @State private var statsText: String = ""
+    @State private var rawJSON: String = ""
+    @State private var showDebug: Bool = false
     
     // MARK: - Body
     
@@ -152,9 +154,16 @@ struct TrendsTabView: View {
     // MARK: - Clean Plot Card
     
     private var cleanPlotCard: some View {
-        TestChartView(
-            viewModel: viewModel,
-            height: 300
+        TrendsChartView(
+            selectedMetric: selectedMetric,
+            selectedMode: selectedTrendMode,
+            height: 300,
+            onStatsUpdate: { stats in
+                statsText = stats
+            },
+            onDebugJSONUpdate: { json in
+                rawJSON = json
+            }
         )
         .background(Color(.systemBackground))
         .cornerRadius(8)
@@ -171,10 +180,11 @@ struct TrendsTabView: View {
                 .foregroundColor(.primary)
             
             HStack(spacing: 16) {
-                legendItem(color: .blue, style: "●", label: "Data points")
-                legendItem(color: .blue.opacity(0.7), style: "- -", label: "Rolling average")
+                legendItem(color: .red.opacity(0.6), style: "▓", label: "±2SD band (SD2)")
+                legendItem(color: .orange.opacity(0.8), style: "▓", label: "±1SD band (SD1)")
+                legendItem(color: .green, style: "- -", label: "Rolling average (3‑pt)")
                 legendItem(color: .gray, style: "—", label: "Baseline")
-                legendItem(color: .blue.opacity(0.2), style: "▓", label: "SD bands")
+                legendItem(color: .blue, style: "●", label: "Data points")
                 Spacer()
             }
         }
@@ -199,12 +209,13 @@ struct TrendsTabView: View {
                 .fontWeight(.medium)
                 .foregroundColor(.primary)
             
-            if viewModel.hasData {
-                Text(viewModel.statisticsSummary)
+            if !statsText.isEmpty {
+                Text(statsText)
                     .font(.caption2)
                     .foregroundColor(.secondary)
+                    .textSelection(.enabled)
             } else {
-                Text("No data available")
+                Text("Awaiting analysis…")
                     .font(.caption2)
                     .foregroundColor(.secondary)
             }
@@ -215,18 +226,28 @@ struct TrendsTabView: View {
     
     private var academicDebugInfo: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("Debug")
-                .font(.caption)
-                .fontWeight(.medium)
-                .foregroundColor(.primary)
-            
-            Text(viewModel.debugInfo.isEmpty ? "No debug information" : viewModel.debugInfo)
-                .font(.caption2)
-                .foregroundColor(.secondary)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(Color(.systemGray6))
-                .cornerRadius(4)
+            DisclosureGroup(isExpanded: $showDebug) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Raw API Response:")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                    ScrollView {
+                        Text(rawJSON.isEmpty ? "<no payload yet>" : rawJSON)
+                            .font(.system(.footnote, design: .monospaced))
+                            .foregroundColor(.secondary)
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .frame(maxHeight: 180)
+                    .background(Color(.systemGray6))
+                    .cornerRadius(4)
+                }
+            } label: {
+                Text("Debug")
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundColor(.primary)
+            }
         }
     }
     
@@ -246,13 +267,11 @@ struct TrendsTabView: View {
     // MARK: - Actions
     
     private func loadInitialData() {
-        // Load initial data using the same pattern as TestTabView
-        viewModel.refreshTestData()
+        // Initial data loading is now handled by TrendsChartView
     }
     
     private func refreshCurrentChart() {
-        // Refresh data when user changes selections
-        viewModel.refreshTestData()
+        // Chart refresh is now handled by TrendsChartView
     }
 }
 
