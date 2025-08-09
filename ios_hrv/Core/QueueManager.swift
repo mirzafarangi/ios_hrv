@@ -70,6 +70,12 @@ class QueueManager: ObservableObject {
         logInfo("Completed items cleared from queue", category: .queue)
     }
     
+    func clearAllItems() {
+        queueItems.removeAll()
+        saveQueueToStorage()
+        logInfo("All items cleared from queue (failed, pending, and completed)", category: .queue)
+    }
+    
     func removeCompletedItems() {
         queueItems.removeAll { $0.status == .completed }
         saveQueueToStorage()

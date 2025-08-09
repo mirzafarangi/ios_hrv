@@ -78,6 +78,17 @@ struct QueueCard: View {
                 .buttonStyle(.bordered)
                 .disabled(!coreEngine.coreState.hasCompletedItems)
                 
+                Button(action: {
+                    coreEngine.clearAllFromQueue()
+                }) {
+                    Label("Clear All", systemImage: "trash.fill")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundColor(.red)
+                }
+                .buttonStyle(.bordered)
+                .disabled(coreEngine.coreState.queueItems.isEmpty)
+                
                 Spacer()
                 
                 Button(action: {

@@ -365,6 +365,11 @@ class CoreEngine: ObservableObject {
         CoreLogger.shared.log("Completed items cleared from queue", category: .queue, level: .info)
     }
     
+    func clearAllFromQueue() {
+        queueManager.clearAllItems()
+        CoreLogger.shared.log("All items cleared from queue (including failed and pending)", category: .queue, level: .info)
+    }
+    
     // MARK: - Session Processing (Simple Counter Only)
     func incrementSessionsProcessed() {
         totalSessionsProcessed += 1
