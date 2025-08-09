@@ -23,7 +23,7 @@ enum CoreEvent {
     
     // Recording Mode Events
     case recordingConfigurationChanged
-    case autoRecordingStarted(sleepEventId: Int)
+    case autoRecordingStarted(intervalNumber: Int)
     case autoRecordingStopped
     case sleepIntervalCompleted(eventId: Int, intervalNumber: Int)
     case sleepEventCreated(eventId: Int)
@@ -109,8 +109,8 @@ class CoreEvents: ObservableObject {
         // Recording Mode Events
         case .recordingConfigurationChanged:
             return "Recording configuration changed"
-        case .autoRecordingStarted(let sleepEventId):
-            return "Auto-recording started: Sleep Event \(sleepEventId)"
+        case .autoRecordingStarted(let intervalNumber):
+            return "Auto-recording started: Sleep Interval \(intervalNumber)"
         case .autoRecordingStopped:
             return "Auto-recording stopped"
         case .sleepIntervalCompleted(let eventId, let intervalNumber):

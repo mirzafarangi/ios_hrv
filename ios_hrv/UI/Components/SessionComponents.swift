@@ -488,11 +488,9 @@ struct SessionTagHeader: View {
     private var tagDisplayName: String {
         switch tag {
         case "sleep": return "Sleep"
-        case "rest": return "Rest"
-        case "experiment_paired_pre": return "Experiment Pre"
-        case "experiment_paired_post": return "Experiment Post"
-        case "experiment_duration": return "Experiment Duration"
-        case "breath_workout": return "Breath Workout"
+        case "wake_check": return "Wake Check"
+        case "pre_sleep": return "Pre-Sleep"
+        case "experiment": return "Experiment"
         default: return tag.capitalized
         }
     }
@@ -548,7 +546,23 @@ struct SessionRowView: View {
                     .fontWeight(.semibold)
                     .foregroundColor(.primary)
                 
-                HStack(spacing: 12) {
+                HStack(spacing: 8) {
+                    // Tag and Subtag
+                    Text("\(session.tag)/\(session.subtag)")
+                        .font(.caption)
+                        .foregroundColor(.blue)
+                    
+                    // Event ID if present
+                    if session.eventId > 0 {
+                        Text("Event #\(session.eventId)")
+                            .font(.caption)
+                            .foregroundColor(.purple)
+                    }
+                    
+                    Text("•")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
                     Text("\(session.durationMinutes) min")
                         .font(.caption)
                         .foregroundColor(.secondary)

@@ -16,6 +16,14 @@ struct SessionsTabView: View {
     @State private var expandedSections: Set<String> = []
     @State private var isLoadingData = false
     
+    // Date formatter for session display
+    private let dateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter
+    }()
+    
     var body: some View {
         NavigationView {
             VStack {
@@ -165,11 +173,11 @@ struct SessionStatisticsCard: View {
                         .fontWeight(.medium)
                         .foregroundColor(.secondary)
                     
-                    ForEach(Array(statistics.processedByTag.keys.sorted(by: { $0 < $1 })), id: \.self) { tagKey in
+                    ForEach(Array(statistics.processedByTag.keys).sorted(), id: \.self) { tagKey in
                         let count = statistics.processedByTag[tagKey] ?? 0
                         HStack {
-                            Image(systemName: tagKey == "rest" ? "heart.fill" : "moon.fill")
-                                .foregroundColor(tagKey == "rest" ? .green : .purple)
+                            Image(systemName: SessionsTabView.getTagIconHelper(tagKey))
+                                .foregroundColor(SessionsTabView.getTagColorHelper(tagKey))
                             Text(tagKey.capitalized)
                             Spacer()
                             Text("\(count) sessions")
@@ -299,13 +307,20 @@ struct RawSessionRow: View {
     let onDelete: (String) -> Void
     @State private var showingDetails = false
     
+    private func formatDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter.string(from: date)
+    }
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack {
-                        Image(systemName: session.tag == "rest" ? "heart.fill" : "moon.fill")
-                            .foregroundColor(session.tag == "rest" ? .green : .purple)
+                        Image(systemName: SessionsTabView.getTagIconHelper(session.tag))
+                            .foregroundColor(SessionsTabView.getTagColorHelper(session.tag))
                         Text(session.sessionId)
                             .font(.caption)
                             .fontWeight(.medium)
@@ -334,12 +349,10 @@ struct RawSessionRow: View {
             
             if showingDetails {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Recorded: \(session.recordedAt, formatter: dateFormatter)")
+                    Text("Recorded: \(formatDate(session.recordedAt))")
                     Text("RR Intervals: \(session.rrIntervals.count)")
                     Text("Subtag: \(session.subtag)")
-                    if let sleepEventId = session.sleepEventId {
-                        Text("Sleep Event ID: \(sleepEventId)")
-                    }
+                    Text("Event ID: \(session.eventId)")
                 }
                 .font(.caption)
                 .foregroundColor(.secondary)
@@ -397,7 +410,7 @@ struct ProcessedSessionRow: View {
             
             if showingDetails {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Processed: \(session.processedAt, formatter: dateFormatter)")
+                    Text("Processed: \(formatDate(session.processedAt ?? Date()))")
                         .font(.caption)
                         .foregroundColor(.secondary)
                     
@@ -430,16 +443,79 @@ struct ProcessedSessionRow: View {
             }
         }
     }
+    
+    private func formatDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter.string(from: date)
+    }
+    
+    static func getTagIcon(_ tag: String) -> String {
+        switch tag {
+        case "wake_check":
+            return "sun.max.fill"
+        case "pre_sleep":
+            return "moon.stars.fill"
+        case "sleep":
+            return "moon.fill"
+        case "experiment":
+            return "flask.fill"
+        default:
+            return "heart.fill"
+        }
+    }
+    
+    static func getTagColor(_ tag: String) -> Color {
+        switch tag {
+        case "wake_check":
+            return .orange
+        case "pre_sleep":
+            return .indigo
+        case "sleep":
+            return .purple
+        case "experiment":
+            return .green
+        default:
+            return .gray
+        }
+    }
 }
 
-// MARK: - Helpers
-private let dateFormatter: DateFormatter = {
-    let formatter = DateFormatter()
-    formatter.dateStyle = .short
-    formatter.timeStyle = .short
-    return formatter
-}()
+// MARK: - Tag Helper Functions
+extension SessionsTabView {
+    static func getTagIconHelper(_ tag: String) -> String {
+        switch tag {
+        case "wake_check":
+            return "sun.max.fill"
+        case "pre_sleep":
+            return "moon.stars.fill"
+        case "sleep":
+            return "moon.fill"
+        case "experiment":
+            return "flask.fill"
+        default:
+            return "heart.fill"
+        }
+    }
+    
+    static func getTagColorHelper(_ tag: String) -> Color {
+        switch tag {
+        case "wake_check":
+            return .orange
+        case "pre_sleep":
+            return .indigo
+        case "sleep":
+            return .purple
+        case "experiment":
+            return .green
+        default:
+            return .gray
+        }
+    }
+}
 
+// MARK: - Preview
 #Preview {
     SessionsTabView()
         .environmentObject(CoreEngine.shared)

@@ -107,16 +107,31 @@ class QueueManager: ObservableObject {
         // Perform upload
         Task {
             do {
-                try await apiClient.uploadSession(queueItem.session)
+                let response = try await apiClient.uploadSession(queueItem.session)
                 
                 await MainActor.run {
-                    // Success
+                    // Success - extract validation report and DB status from response
+                    if let validationReport = response["validation_report"] as? [String: Any] {
+                        self.queueItems[index].validationReport = validationReport
+                    }
+                    if let dbStatus = response["db_status"] as? String {
+                        self.queueItems[index].dbStatus = dbStatus
+                    }
+                    
                     self.queueItems[index].status = .completed
                     self.queueStatus = .idle
                     self.saveQueueToStorage()
                     
                     logFlowComplete("Session Upload", category: .api)
-        logInfo("Upload successful: session_id=\(queueItem.session.id)", category: .api)
+                    logInfo("Upload successful: session_id=\(queueItem.session.id), db_status=\(self.queueItems[index].dbStatus ?? "unknown")", category: .api)
+                    
+                    // Log validation details if available
+                    if let validationReport = self.queueItems[index].validationReport,
+                       let validationResult = validationReport["validation_result"] as? [String: Any],
+                       let isValid = validationResult["is_valid"] as? Bool {
+                        logInfo("Validation result: valid=\(isValid)", category: .api)
+                    }
+                    
                     CoreEvents.shared.emit(.sessionUploadCompleted(sessionId: queueItem.session.id))
                     
                     // Try next item

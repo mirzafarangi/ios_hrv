@@ -1,13 +1,15 @@
 /**
  * ConfigCard.swift
  * Recording configuration UI component for HRV iOS App
- * Tag selection and duration settings
+ * Canonical tag selection and duration settings (db_schema.sql compliant)
  */
 
 import SwiftUI
 
 struct ConfigCard: View {
     @EnvironmentObject var coreEngine: CoreEngine
+    @State private var experimentProtocolName: String = ""
+    @State private var isPairedMode: Bool = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -25,7 +27,7 @@ struct ConfigCard: View {
                 Spacer()
             }
             
-            // Tag Selection (Dropdown)
+            // Tag Selection (Canonical - 4 tags only)
             VStack(alignment: .leading, spacing: 8) {
                 Text("Recording Type")
                     .font(.subheadline)
@@ -33,10 +35,16 @@ struct ConfigCard: View {
                     .foregroundColor(.primary)
                 
                 Menu {
+                    // Canonical tags: wake_check, pre_sleep, sleep, experiment
                     ForEach(SessionTag.allCases, id: \.self) { tag in
                         Button(action: {
                             let duration = tag.defaultDurationMinutes
-                            coreEngine.updateRecordingConfiguration(tag: tag, duration: duration)
+                            coreEngine.updateRecordingConfiguration(
+                                tag: tag,
+                                duration: duration,
+                                isPaired: isPairedMode,
+                                protocolName: experimentProtocolName
+                            )
                         }) {
                             HStack {
                                 Image(systemName: tag.icon)
@@ -75,6 +83,61 @@ struct ConfigCard: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .padding(.top, 4)
+            }
+            
+            // Additional Options for specific tags
+            if coreEngine.coreState.selectedTag == .wakeCheck || coreEngine.coreState.selectedTag == .preSleep {
+                // Paired mode toggle for wake_check and pre_sleep
+                Toggle(isOn: $isPairedMode) {
+                    HStack {
+                        Image(systemName: "link")
+                            .foregroundColor(.blue)
+                        Text("Paired Mode")
+                            .font(.subheadline)
+                    }
+                }
+                .onChange(of: isPairedMode) { _, newValue in
+                    coreEngine.updateRecordingConfiguration(
+                        tag: coreEngine.coreState.selectedTag,
+                        duration: coreEngine.coreState.selectedDuration,
+                        isPaired: newValue,
+                        protocolName: experimentProtocolName
+                    )
+                }
+                
+                if isPairedMode {
+                    Text(coreEngine.coreState.selectedTag == .wakeCheck ? 
+                         "Will generate subtag: wake_check_paired_day_pre" :
+                         "Will generate subtag: pre_sleep_paired_day_post")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            
+            if coreEngine.coreState.selectedTag == .experiment {
+                // Protocol name input for experiment tag
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Protocol Name (optional)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
+                    TextField("Enter protocol name", text: $experimentProtocolName)
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                        .onChange(of: experimentProtocolName) { _, newValue in
+                            coreEngine.updateRecordingConfiguration(
+                                tag: coreEngine.coreState.selectedTag,
+                                duration: coreEngine.coreState.selectedDuration,
+                                isPaired: isPairedMode,
+                                protocolName: newValue
+                            )
+                        }
+                    
+                    Text(experimentProtocolName.isEmpty ?
+                         "Will generate subtag: experiment_single" :
+                         "Will generate subtag: experiment_protocol_\(experimentProtocolName.lowercased().replacingOccurrences(of: " ", with: "_"))")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
             }
             
             // Duration Selection
@@ -126,8 +189,8 @@ struct ConfigCard: View {
                 .accentColor(.blue)
                 
                 // Duration hint for sleep mode
-                if coreEngine.coreState.selectedTag.isAutoRecordingMode {
-                    Text("Sleep mode records continuous intervals until you stop")
+                if coreEngine.coreState.selectedTag == .sleep {
+                    Text("Sleep mode records continuous intervals until you stop. Each interval will be tagged as sleep_interval_1, sleep_interval_2, etc.")
                         .font(.caption)
                         .foregroundColor(.secondary)
                         .padding(.top, 4)
@@ -158,8 +221,13 @@ struct ConfigCard: View {
     private var configurationSummary: String {
         let tag = coreEngine.coreState.selectedTag
         let duration = coreEngine.coreState.selectedDuration
+        let subtag = tag.generateSubtag(
+            isPaired: isPairedMode,
+            intervalNumber: tag == .sleep ? 1 : nil,
+            protocolName: experimentProtocolName.isEmpty ? nil : experimentProtocolName
+        )
         
-        return "\(tag.description) for \(duration) minute\(duration == 1 ? "" : "s")"
+        return "\(tag.description) for \(duration) minute\(duration == 1 ? "" : "s") (\(subtag))"
     }
 }
 
@@ -168,7 +236,7 @@ struct ConfigCard: View {
         ConfigCard()
             .environmentObject({
                 let engine = CoreEngine.shared
-                engine.coreState.selectedTag = .rest
+                engine.coreState.selectedTag = .wakeCheck
                 engine.coreState.selectedDuration = 5
                 return engine
             }())

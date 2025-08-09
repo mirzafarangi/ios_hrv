@@ -6,63 +6,49 @@
 
 import Foundation
 
-// MARK: - Session Tag
+// MARK: - Session Tag (Canonical - matches db_schema.sql)
 enum SessionTag: String, CaseIterable, Codable {
+    case wakeCheck = "wake_check"
+    case preSleep = "pre_sleep"
     case sleep = "sleep"
-    case rest = "rest"
-    case experimentPairedPre = "experiment_paired_pre"
-    case experimentPairedPost = "experiment_paired_post"
-    case experimentDuration = "experiment_duration"
-    case breathWorkout = "breath_workout"
+    case experiment = "experiment"
     
     var displayName: String {
         switch self {
-        case .rest:
-            return "Rest"
+        case .wakeCheck:
+            return "Wake Check"
+        case .preSleep:
+            return "Pre-Sleep"
         case .sleep:
             return "Sleep"
-        case .experimentPairedPre:
-            return "Experiment Paired Pre"
-        case .experimentPairedPost:
-            return "Experiment Paired Post"
-        case .experimentDuration:
-            return "Experiment Duration"
-        case .breathWorkout:
-            return "Breath Workout"
+        case .experiment:
+            return "Experiment"
         }
     }
     
     var icon: String {
         switch self {
-        case .rest:
-            return "heart.fill"
+        case .wakeCheck:
+            return "sunrise.fill"
+        case .preSleep:
+            return "moon.stars.fill"
         case .sleep:
             return "moon.fill"
-        case .experimentPairedPre:
+        case .experiment:
             return "flask.fill"
-        case .experimentPairedPost:
-            return "checkmark.circle.fill"
-        case .experimentDuration:
-            return "timer.circle.fill"
-        case .breathWorkout:
-            return "lungs.fill"
         }
     }
     
     var description: String {
         switch self {
-        case .rest:
-            return "Resting HRV measurement"
+        case .wakeCheck:
+            return "Morning wake check HRV measurement"
+        case .preSleep:
+            return "Pre-sleep HRV measurement"
         case .sleep:
             return "Sleep HRV recording with auto-intervals"
-        case .experimentPairedPre:
-            return "Pre-experiment baseline measurement"
-        case .experimentPairedPost:
-            return "Post-experiment measurement"
-        case .experimentDuration:
-            return "Extended experimental measurement"
-        case .breathWorkout:
-            return "Breathing exercise HRV measurement"
+        case .experiment:
+            return "Experimental protocol measurement"
         }
     }
     
@@ -77,15 +63,13 @@ enum SessionTag: String, CaseIterable, Codable {
     
     var defaultDurationMinutes: Int {
         switch self {
-        case .rest:
-            return 7
+        case .wakeCheck:
+            return 5
+        case .preSleep:
+            return 5
         case .sleep:
             return 7  // Per interval
-        case .experimentPairedPre, .experimentPairedPost:
-            return 5
-        case .experimentDuration:
-            return 15
-        case .breathWorkout:
+        case .experiment:
             return 10
         }
     }
@@ -97,16 +81,47 @@ enum SessionTag: String, CaseIterable, Codable {
     var maxDurationMinutes: Int {
         return 60
     }
+    
+    // MARK: - Canonical Subtag Generation (matches db_schema.sql constraints)
+    func generateSubtag(isPaired: Bool = false, intervalNumber: Int? = nil, protocolName: String? = nil) -> String {
+        switch self {
+        case .wakeCheck:
+            // wake_check_(single|paired_day_pre)
+            return isPaired ? "wake_check_paired_day_pre" : "wake_check_single"
+            
+        case .preSleep:
+            // pre_sleep_(single|paired_day_post)
+            return isPaired ? "pre_sleep_paired_day_post" : "pre_sleep_single"
+            
+        case .sleep:
+            // sleep_interval_[1-9][0-9]*
+            let interval = intervalNumber ?? 1
+            return "sleep_interval_\(interval)"
+            
+        case .experiment:
+            // experiment_(single|protocol_[a-z0-9_]+)
+            if let protocolStr = protocolName, !protocolStr.isEmpty {
+                // Sanitize protocol name to match regex: [a-z0-9_]+
+                let sanitized = protocolStr.lowercased()
+                    .replacingOccurrences(of: " ", with: "_")
+                    .replacingOccurrences(of: "-", with: "_")
+                    .filter { $0.isLetter || $0.isNumber || $0 == "_" }
+                return "experiment_protocol_\(sanitized)"
+            } else {
+                return "experiment_single"
+            }
+        }
+    }
 }
 
-// MARK: - Recording Mode
+// MARK: - Recording Mode (Canonical)
 enum RecordingMode: Equatable {
-    case single(tag: SessionTag, duration: Int)
-    case autoRecording(sleepEventId: Int, intervalDuration: Int, currentInterval: Int)
+    case single(tag: SessionTag, duration: Int, protocolName: String? = nil)
+    case autoRecording(intervalDuration: Int, currentInterval: Int, dbEventId: Int? = nil)
     
     var tag: SessionTag {
         switch self {
-        case .single(let tag, _):
+        case .single(let tag, _, _):
             return tag
         case .autoRecording(_, _, _):
             return .sleep
@@ -115,9 +130,9 @@ enum RecordingMode: Equatable {
     
     var duration: Int {
         switch self {
-        case .single(_, let duration):
+        case .single(_, let duration, _):
             return duration
-        case .autoRecording(_, let intervalDuration, _):
+        case .autoRecording(let intervalDuration, _, _):
             return intervalDuration
         }
     }
@@ -133,44 +148,24 @@ enum RecordingMode: Equatable {
     
     var displayText: String {
         switch self {
-        case .single(let tag, let duration):
+        case .single(let tag, let duration, let protocolName):
+            if let protocolStr = protocolName {
+                return "\(tag.displayName) (\(protocolStr)) - \(duration) min"
+            }
             return "\(tag.displayName) - \(duration) min"
-        case .autoRecording(let eventId, let duration, let interval):
-            return "Sleep Event \(eventId) - Interval \(interval) (\(duration) min)"
+        case .autoRecording(let duration, let interval, let dbEventId):
+            if let eventId = dbEventId {
+                return "Sleep Event \(eventId) - Interval \(interval) (\(duration) min)"
+            }
+            return "Sleep Recording - Interval \(interval) (\(duration) min)"
         }
     }
 }
 
 // MARK: - Sleep Event Management
-struct SleepEvent: Codable, Identifiable {
-    let id: Int  // 1001, 1002, 1003, etc.
-    let startedAt: Date
-    var endedAt: Date?
-    var intervalCount: Int
-    var isActive: Bool
-    
-    init(id: Int) {
-        self.id = id
-        self.startedAt = Date()
-        self.endedAt = nil
-        self.intervalCount = 0
-        self.isActive = true
-    }
-    
-    mutating func addInterval() {
-        intervalCount += 1
-    }
-    
-    mutating func end() {
-        endedAt = Date()
-        isActive = false
-    }
-    
-    var duration: TimeInterval? {
-        guard let endedAt = endedAt else { return nil }
-        return endedAt.timeIntervalSince(startedAt)
-    }
-}
+// Note: Event ID allocation is handled entirely by DB trigger.
+// The iOS app always sends event_id=0 for all sessions.
+// For sleep sessions, the DB assigns and returns the appropriate event_id.
 
 // MARK: - Sensor Connection State
 enum SensorConnectionState: Equatable {
@@ -297,6 +292,8 @@ struct QueueItem: Identifiable, Codable {
     var lastAttemptAt: Date?
     var attemptCount: Int
     var errorMessage: String?
+    var validationReport: [String: Any]?
+    var dbStatus: String?
     
     init(session: Session) {
         self.id = session.id
@@ -306,6 +303,8 @@ struct QueueItem: Identifiable, Codable {
         self.lastAttemptAt = nil
         self.attemptCount = 0
         self.errorMessage = nil
+        self.validationReport = nil
+        self.dbStatus = nil
     }
     
     var displayName: String {

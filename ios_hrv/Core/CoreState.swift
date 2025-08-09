@@ -1,7 +1,7 @@
 /**
  * CoreState.swift
  * App-wide observable state for HRV iOS App
- * Holds all shared state bound to SwiftUI views
+ * Canonical compliant with db_schema.sql and blueprint_api.md
  */
 
 import Foundation
@@ -17,8 +17,14 @@ struct CoreState {
     // MARK: - Recording State
     var isRecording: Bool = false
     var currentSession: Session? = nil
-    var selectedTag: SessionTag = .rest
+    var selectedTag: SessionTag = .wakeCheck  // Default to canonical tag
     var selectedDuration: Int = 5 // minutes
+    
+    // MARK: - Canonical Configuration
+    var isPairedMode: Bool = false  // For wake_check/pre_sleep paired mode
+    var experimentProtocolName: String? = nil  // For experiment protocol subtag
+    var currentSleepIntervalNumber: Int = 1  // Track sleep interval number
+    var lastApiEventId: Int? = nil  // Store event_id returned by API for reference
     
     // MARK: - Recording Timer State
     var recordingProgress: Double = 0.0 // 0.0 to 1.0
@@ -26,26 +32,12 @@ struct CoreState {
     var elapsedTime: Int = 0 // seconds elapsed
     
     // MARK: - Recording Mode State
-    var recordingMode: RecordingMode = .single(tag: .rest, duration: 5)
-    var currentSleepEvent: SleepEvent? = nil
-    var sleepEventHistory: [SleepEvent] = []
+    var recordingMode: RecordingMode = .single(tag: .wakeCheck, duration: 5)
+    // Note: SleepEvent is deprecated - DB trigger handles event_id allocation
     
-    // MARK: - Sleep Event Management
-    var nextSleepEventId: Int {
-        // Start from 1001, increment based on history
-        let maxId = sleepEventHistory.map { $0.id }.max() ?? 1000
-        return maxId + 1
-    }
-    
+    // MARK: - Sleep Event Management (Canonical)
     var isInAutoRecordingMode: Bool {
         return recordingMode.isAutoRecording
-    }
-    
-    var currentSleepIntervalNumber: Int {
-        if case .autoRecording(_, _, let interval) = recordingMode {
-            return interval
-        }
-        return 0
     }
     
     // MARK: - Queue State

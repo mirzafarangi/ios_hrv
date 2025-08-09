@@ -79,7 +79,6 @@ class DatabaseSessionManager: ObservableObject {
                         processed_at,
                         mean_hr,
                         mean_rr,
-                        count_rr,
                         rmssd,
                         sdnn,
                         pnn50,
@@ -238,7 +237,6 @@ class DatabaseSessionManager: ObservableObject {
                     processed_at,
                     mean_hr,
                     mean_rr,
-                    count_rr,
                     rmssd,
                     sdnn,
                     pnn50,
@@ -342,7 +340,6 @@ struct DatabaseSession: Codable, Identifiable {
     // HRV Metrics (all 9 from final schema)
     let meanHr: Double?
     let meanRr: Double?
-    let countRr: Int?
     let rmssd: Double?
     let sdnn: Double?
     let pnn50: Double?
@@ -367,11 +364,10 @@ struct DatabaseSession: Codable, Identifiable {
     
     var tagEmoji: String {
         switch tag {
-        case "rest": return "🧘"
+        case "wake_check": return "☀️"
+        case "pre_sleep": return "🌙"
         case "sleep": return "😴"
-        case "exercise": return "🏃"
-        case "stress": return "😰"
-        case "meditation": return "🧘‍♀️"
+        case "experiment": return "🧪"
         default: return "📊"
         }
     }
@@ -393,7 +389,6 @@ struct DatabaseSession: Codable, Identifiable {
         case processedAt = "processed_at"
         case meanHr = "mean_hr"
         case meanRr = "mean_rr"
-        case countRr = "count_rr"
         case rmssd, sdnn, pnn50
         case cvRr = "cv_rr"
         case defa

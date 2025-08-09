@@ -1,7 +1,7 @@
 /**
  * RecordingManager.swift
  * Recording session manager for HRV iOS App
- * Controls manual and timed recording logic, session timing, and state transitions
+ * Canonical compliant with db_schema.sql - always sends event_id=0
  */
 
 import Foundation
@@ -21,9 +21,11 @@ class RecordingManager: ObservableObject {
     private var progressTimer: Timer?
     private var recordingStartTime: Date?
     private var recordingDuration: Int = 0 // minutes
-    private var recordingTag: SessionTag = .rest
+    private var recordingTag: SessionTag = .wakeCheck  // Default to canonical tag
     private var heartRateData: [Double] = []
     private var heartRateSubscription: AnyCancellable?
+    private var currentSubtag: String = ""  // Store generated subtag
+    private var currentIntervalNumber: Int = 1  // For sleep intervals
     
     // MARK: - Constants
     private let minimumRecordingDuration: TimeInterval = 30 // 30 seconds minimum
@@ -39,8 +41,9 @@ class RecordingManager: ObservableObject {
         tag: SessionTag, 
         duration: TimeInterval, 
         heartRatePublisher: AnyPublisher<Int, Never>,
-        subtag: String? = nil,
-        sleepEventId: Int? = nil
+        isPaired: Bool = false,
+        intervalNumber: Int? = nil,
+        protocolName: String? = nil
     ) {
         guard !isRecording else {
             logWarning("Recording already in progress", category: .recording)
@@ -63,19 +66,30 @@ class RecordingManager: ObservableObject {
         heartRateData.removeAll()
         isRecording = true
         
+        // Generate canonical subtag based on tag and context
+        currentIntervalNumber = intervalNumber ?? 1
+        currentSubtag = tag.generateSubtag(
+            isPaired: isPaired,
+            intervalNumber: tag == .sleep ? currentIntervalNumber : nil,
+            protocolName: protocolName
+        )
+        
+        logInfo("Generated canonical subtag: \(currentSubtag)", category: .recording)
+        
         // Subscribe to heart rate data
         heartRateSubscription = heartRatePublisher
             .sink { [weak self] heartRate in
                 self?.processHeartRateData(heartRate)
             }
         
-        // Create current session for UI display (Unified Schema)
+        // Create current session for UI display (Canonical compliant)
+        // Note: duration here is the CONFIGURED duration in MINUTES, will be updated with ACTUAL duration on stop
         currentSession = Session(
             userId: userId,
-            tag: tag.rawValue,              // Convert SessionTag to string
-            subtag: subtag ?? "\(tag.rawValue)_single", // Default subtag for non-sleep
-            eventId: sleepEventId ?? 0,     // 0 for non-grouped sessions
-            duration: Int(duration),
+            tag: tag.rawValue,              // Canonical tag as string
+            subtag: currentSubtag,          // Generated canonical subtag
+            eventId: 0,                     // ALWAYS 0 - DB trigger handles allocation
+            duration: Int(duration),        // Duration in MINUTES as per API/DB schema
             rrIntervals: []
         )
         
@@ -86,38 +100,48 @@ class RecordingManager: ObservableObject {
         CoreEvents.shared.emit(.recordingStarted(tag: tag, duration: Int(duration)))
     }
     
-    func stopRecording() {
-        guard isRecording else {
-            logWarning("No recording in progress", category: .recording)
-            return
-        }
+    func stopRecording(isAutoStop: Bool = false) {
+        guard isRecording else { return }
         
-        logFlowStep("Recording Session", step: "Stop initiated", category: .recording)
+        logInfo("Stopping recording (auto: \(isAutoStop))", category: .recording)
         
-        // Stop all timers and subscriptions
+        // Cancel timers
         recordingTimer?.invalidate()
         recordingTimer = nil
         progressTimer?.invalidate()
         progressTimer = nil
-        heartRateSubscription?.cancel()
-        heartRateSubscription = nil
         
-        // Reset timer state
-        recordingProgress = 0.0
-        remainingTime = 0
-        elapsedTime = 0
+        // Calculate actual duration in seconds
+        let actualDurationSeconds = recordingStartTime.map { Date().timeIntervalSince($0) } ?? 0
         
-        // Calculate actual duration
-        let actualDuration = recordingStartTime.map { Date().timeIntervalSince($0) } ?? 0
-        
-        // Validate recording
-        if actualDuration < minimumRecordingDuration {
-            logError("Recording too short: \(actualDuration)s (minimum: \(minimumRecordingDuration)s)", category: .recording)
+        // RADICAL FIX: Only process completed sessions
+        // For non-sleep: only if auto-stopped (timer completed)
+        // For sleep: only send completed intervals
+        if !isAutoStop && currentSession?.tag != SessionTag.sleep.rawValue {
+            // Manual stop for non-sleep = discard session
+            let discardMessage = "Session discarded. Non-sleep recordings must complete the full duration."
+            logInfo(discardMessage, category: .recording)
             
+            // Clean up state
             isRecording = false
             currentSession = nil
+            heartRateData.removeAll()
+            recordingStartTime = nil
+            elapsedTime = 0
+            remainingTime = 0
+            recordingProgress = 0.0
             
-            CoreEvents.shared.emit(.recordingFailed(error: "Recording too short"))
+            // Update CoreState on MainActor
+            Task { @MainActor in
+                CoreEngine.shared.coreState.isRecording = false
+                CoreEngine.shared.coreState.currentSession = nil
+                CoreEngine.shared.coreState.elapsedTime = 0
+                CoreEngine.shared.coreState.remainingTime = 0
+                CoreEngine.shared.coreState.recordingProgress = 0.0
+            }
+            
+            // Emit info event (not an error, just discarded)
+            CoreEvents.shared.emit(.recordingDiscarded(reason: discardMessage))
             return
         }
         
@@ -131,30 +155,59 @@ class RecordingManager: ObservableObject {
             return
         }
         
-        // Create completed session (Unified Schema)
-        let completedSession = Session(
-            id: currentSession?.id ?? UUID().uuidString,
-            userId: currentSession?.userId ?? "",
-            tag: currentSession?.tag ?? recordingTag.rawValue,
-            subtag: currentSession?.subtag ?? "\(recordingTag.rawValue)_single",
-            eventId: currentSession?.eventId ?? 0,
-            duration: recordingDuration,
-            rrIntervals: heartRateData,
-            recordedAt: recordingStartTime ?? Date()
-        )
+        // For sleep mode with manual stop - discard incomplete interval
+        if !isAutoStop && currentSession?.tag == SessionTag.sleep.rawValue {
+            let discardMessage = "Incomplete sleep interval discarded. Only completed intervals are saved."
+            logInfo(discardMessage, category: .recording)
+            
+            // Clean up state but don't emit error
+            isRecording = false
+            currentSession = nil
+            heartRateData.removeAll()
+            recordingStartTime = nil
+            elapsedTime = 0
+            remainingTime = 0
+            recordingProgress = 0.0
+            
+            // Update CoreState on MainActor
+            Task { @MainActor in
+                CoreEngine.shared.coreState.isRecording = false
+                CoreEngine.shared.coreState.currentSession = nil
+                CoreEngine.shared.coreState.elapsedTime = 0
+                CoreEngine.shared.coreState.remainingTime = 0
+                CoreEngine.shared.coreState.recordingProgress = 0.0
+            }
+            
+            return
+        }
         
-        logInfo("Recording completed: hr_readings=\(heartRateData.count), rr_intervals=\(heartRateData.count)", category: .recording)
-        
-        // Update state
-        isRecording = false
-        currentSession = nil
-        
-        // Notify completion
-        CoreEvents.shared.emit(.recordingCompleted(session: completedSession))
-        
-        // Add to queue via CoreEngine
-        Task { @MainActor in
-            CoreEngine.shared.processCompletedSession(completedSession)
+        // Process the recording - only for auto-stopped sessions
+        if let session = currentSession {
+            // Use configured duration for completed sessions
+            let finalSession = Session(
+                id: session.id,
+                userId: session.userId,
+                tag: session.tag,
+                subtag: session.subtag,
+                eventId: 0,  // Always 0 per canonical
+                duration: recordingDuration,  // Use configured duration for completed sessions
+                rrIntervals: heartRateData,
+                recordedAt: session.recordedAt
+            )
+            
+            logInfo("Recording completed: hr_readings=\(heartRateData.count), rr_intervals=\(heartRateData.count), actual_duration=\(actualDurationSeconds) s", category: .recording)
+            
+            // Update state
+            isRecording = false
+            currentSession = nil
+            
+            // Notify completion
+            CoreEvents.shared.emit(.recordingCompleted(session: finalSession))
+            
+            // Add to queue via CoreEngine
+            Task { @MainActor in
+                CoreEngine.shared.processCompletedSession(finalSession)
+            }
         }
     }
     
@@ -165,11 +218,14 @@ class RecordingManager: ObservableObject {
         elapsedTime = 0
         recordingProgress = 0.0
         
+        // Store the configured duration for reference
+        recordingDuration = duration
+        
         // Main recording timer - auto-stops after duration
         recordingTimer = Timer.scheduledTimer(withTimeInterval: TimeInterval(totalSeconds), repeats: false) { [weak self] _ in
             logInfo("Recording timer expired - initiating auto-stop", category: .recording)
             Task { @MainActor in
-                self?.stopRecording()
+                self?.stopRecording(isAutoStop: true)  // Mark as auto-stop
             }
         }
         
@@ -185,24 +241,31 @@ class RecordingManager: ObservableObject {
     
     @MainActor
     private func updateProgress() {
-        guard isRecording, let startTime = recordingStartTime else { return }
+        guard isRecording,
+              let startTime = recordingStartTime else { return }
         
         let elapsed = Int(Date().timeIntervalSince(startTime))
-        let totalDuration = recordingDuration * 60
+        let totalDurationSeconds = recordingDuration * 60
         
         elapsedTime = elapsed
-        remainingTime = max(0, totalDuration - elapsed)
-        recordingProgress = min(1.0, Double(elapsed) / Double(totalDuration))
+        remainingTime = max(0, totalDurationSeconds - elapsed)
+        recordingProgress = min(1.0, Double(elapsed) / Double(totalDurationSeconds))
         
-        // Update current session heart rate count for UI (Unified Schema)
+        // Update CoreState for UI
+        CoreEngine.shared.coreState.elapsedTime = elapsed
+        CoreEngine.shared.coreState.remainingTime = remainingTime
+        CoreEngine.shared.coreState.recordingProgress = recordingProgress
+        
+        // Update current session heart rate count for UI (Canonical)
         if let session = currentSession {
+            // Keep configured duration for display during recording
             currentSession = Session(
                 id: session.id,
                 userId: session.userId,
                 tag: session.tag,
                 subtag: session.subtag,
-                eventId: session.eventId,
-                duration: session.duration,
+                eventId: 0,  // Always 0 per canonical
+                duration: recordingDuration,  // Keep configured duration during recording
                 rrIntervals: heartRateData,
                 recordedAt: session.recordedAt
             )
@@ -232,13 +295,14 @@ class RecordingManager: ObservableObject {
         
         // Update current session for UI (Unified Schema)
         if let session = currentSession {
+            // Keep configured duration for display during recording
             currentSession = Session(
                 id: session.id,
                 userId: session.userId,
                 tag: session.tag,
                 subtag: session.subtag,
                 eventId: session.eventId,
-                duration: session.duration,
+                duration: recordingDuration,  // Keep configured duration during recording
                 rrIntervals: heartRateData,
                 recordedAt: session.recordedAt
             )

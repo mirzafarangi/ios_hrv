@@ -74,7 +74,7 @@ class APIClient {
     }
     
     // MARK: - Public Interface
-    func uploadSession(_ session: Session) async throws {
+    func uploadSession(_ session: Session) async throws -> [String: Any] {
         let endpoint = Endpoint.uploadSession
         let url = baseURL.appendingPathComponent(endpoint.path)
         
@@ -103,7 +103,22 @@ class APIClient {
             throw APIError.serverError(httpResponse.statusCode, errorMessage)
         }
         
-        print("✅ Session uploaded successfully: \(session.id)")
+        // Parse and return the full response including validation report
+        if let responseDict = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            print("✅ Session uploaded successfully: \(session.id)")
+            
+            // Log validation report if present
+            if let validationReport = responseDict["validation_report"] as? [String: Any],
+               let validationResult = validationReport["validation_result"] as? [String: Any],
+               let isValid = validationResult["is_valid"] as? Bool {
+                print("📊 Validation result: valid=\(isValid)")
+            }
+            
+            return responseDict
+        } else {
+            print("✅ Session uploaded successfully: \(session.id) (no response body)")
+            return [:]
+        }
     }
     
     func getSessionStatus(_ sessionId: String) async throws -> SessionStatusResponse {

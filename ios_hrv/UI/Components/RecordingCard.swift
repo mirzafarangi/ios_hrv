@@ -111,14 +111,13 @@ struct RecordingCard: View {
                     }
                     
                     // Sleep Event Information (Auto-Recording Mode)
-                    if coreEngine.coreState.isInAutoRecordingMode,
-                       let sleepEvent = coreEngine.coreState.currentSleepEvent {
+                    if coreEngine.coreState.isInAutoRecordingMode {
                         HStack {
                             Image(systemName: "moon.circle.fill")
                                 .foregroundColor(.purple)
                                 .font(.caption)
                             
-                            Text("Sleep Event \(sleepEvent.id)")
+                            Text("Sleep Recording")
                                 .font(.caption)
                                 .fontWeight(.medium)
                             
@@ -131,10 +130,6 @@ struct RecordingCard: View {
                                 .foregroundColor(.secondary)
                             
                             Spacer()
-                            
-                            Text("\(sleepEvent.intervalCount) completed")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
                         }
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
@@ -330,18 +325,14 @@ struct RecordingCard: View {
     
     private func getTagIcon(_ tag: String) -> String {
         switch tag.lowercased() {
-        case "rest":
-            return "bed.double.fill"
+        case "wake_check":
+            return "sun.max.fill"
+        case "pre_sleep":
+            return "moon.stars.fill"
         case "sleep":
             return "moon.fill"
-        case "experiment_paired_pre":
+        case "experiment":
             return "flask.fill"
-        case "experiment_paired_post":
-            return "checkmark.circle.fill"
-        case "experiment_duration":
-            return "timer"
-        case "breath_workout":
-            return "lungs.fill"
         default:
             return "heart.fill"
         }
@@ -349,18 +340,14 @@ struct RecordingCard: View {
     
     private func getTagDisplayName(_ tag: String) -> String {
         switch tag.lowercased() {
-        case "rest":
-            return "Rest"
+        case "wake_check":
+            return "Wake Check"
+        case "pre_sleep":
+            return "Pre-Sleep"
         case "sleep":
             return "Sleep"
-        case "experiment_paired_pre":
-            return "Experiment (Pre)"
-        case "experiment_paired_post":
-            return "Experiment (Post)"
-        case "experiment_duration":
-            return "Experiment (Duration)"
-        case "breath_workout":
-            return "Breath Workout"
+        case "experiment":
+            return "Experiment"
         default:
             return tag.capitalized
         }
@@ -375,7 +362,7 @@ struct RecordingCard: View {
                 let engine = CoreEngine.shared
                 engine.coreState.sensorConnectionState = .connected
                 engine.coreState.isRecording = false
-                engine.coreState.selectedTag = .rest
+                engine.coreState.selectedTag = .wakeCheck
                 engine.coreState.selectedDuration = 5
                 return engine
             }())
@@ -390,7 +377,7 @@ struct RecordingCard: View {
                 engine.coreState.currentSession = Session(
                     id: "test-session-2",
                     userId: "test",
-                    tag: "rest",
+                    tag: "wake_check",
                     subtag: "",
                     eventId: 0,
                     duration: 5,

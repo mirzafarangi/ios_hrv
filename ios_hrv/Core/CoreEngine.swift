@@ -181,8 +181,11 @@ class CoreEngine: ObservableObject {
         
         recordingManager.startRecording(
             tag: tag,
-            duration: TimeInterval(duration),
-            heartRatePublisher: bleManager.heartRatePublisher
+            duration: TimeInterval(duration * 60), // Convert minutes to seconds
+            heartRatePublisher: bleManager.heartRatePublisher,
+            isPaired: coreState.isPairedMode,
+            intervalNumber: tag == .sleep ? coreState.currentSleepIntervalNumber : nil,
+            protocolName: coreState.experimentProtocolName
         )
         
         // Event emission handled by RecordingManager to avoid duplicates
@@ -195,19 +198,29 @@ class CoreEngine: ObservableObject {
     }
     
     // MARK: - Recording Mode Management
-    func updateRecordingConfiguration(tag: SessionTag, duration: Int) {
+    func updateRecordingConfiguration(
+        tag: SessionTag,
+        duration: Int,
+        isPaired: Bool = false,
+        protocolName: String? = nil
+    ) {
         coreState.selectedTag = tag
         coreState.selectedDuration = duration
         
+        // Store additional configuration for subtag generation
+        coreState.isPairedMode = isPaired
+        coreState.experimentProtocolName = protocolName
+        
         // Update recording mode based on tag
-        if tag.isAutoRecordingMode {
-            // For sleep tag, prepare auto-recording mode
-            let sleepEventId = coreState.nextSleepEventId
-            coreState.recordingMode = .autoRecording(sleepEventId: sleepEventId, intervalDuration: duration, currentInterval: 1)
-            CoreLogger.shared.log("Configured auto-recording mode for sleep event \(sleepEventId)", category: .core, level: .info)
+        if tag == .sleep {
+            // For sleep tag, prepare auto-recording mode with interval tracking
+            // NO event_id generation - DB trigger handles this
+            coreState.recordingMode = .autoRecording(intervalDuration: duration, currentInterval: 1, dbEventId: nil)
+            coreState.currentSleepIntervalNumber = 1
+            CoreLogger.shared.log("Configured auto-recording mode for sleep intervals", category: .core, level: .info)
         } else {
             // For other tags, use single recording mode
-            coreState.recordingMode = .single(tag: tag, duration: duration)
+            coreState.recordingMode = .single(tag: tag, duration: duration, protocolName: protocolName)
             CoreLogger.shared.log("Configured single recording mode for \(tag.displayName)", category: .core, level: .info)
         }
         
@@ -221,11 +234,11 @@ class CoreEngine: ObservableObject {
         }
         
         switch coreState.recordingMode {
-        case .single(let tag, let duration):
+        case .single(let tag, let duration, _):
             startSingleRecording(tag: tag, duration: duration)
             
-        case .autoRecording(let sleepEventId, let intervalDuration, let currentInterval):
-            startSleepIntervalRecording(sleepEventId: sleepEventId, intervalDuration: intervalDuration, intervalNumber: currentInterval)
+        case .autoRecording(let intervalDuration, let currentInterval, _):
+            startSleepIntervalRecording(intervalDuration: intervalDuration, intervalNumber: currentInterval)
         }
     }
     
@@ -239,54 +252,47 @@ class CoreEngine: ObservableObject {
         
         recordingManager.startRecording(
             tag: tag,
-            duration: TimeInterval(duration), // Duration is already in minutes
+            duration: TimeInterval(duration * 60), // Convert minutes to seconds
             heartRatePublisher: bleManager.heartRatePublisher,
-            subtag: nil,
-            sleepEventId: nil
+            isPaired: coreState.isPairedMode,
+            intervalNumber: nil,
+            protocolName: coreState.experimentProtocolName
         )
     }
     
-    private func startSleepIntervalRecording(sleepEventId: Int, intervalDuration: Int, intervalNumber: Int) {
-        CoreLogger.shared.log("Starting sleep interval \(intervalNumber) for event \(sleepEventId)", category: .recording, level: .info)
+    private func startSleepIntervalRecording(intervalDuration: Int, intervalNumber: Int) {
+        CoreLogger.shared.log("Starting sleep interval \(intervalNumber)", category: .recording, level: .info)
         
         guard userId != nil else {
             CoreLogger.shared.log("Cannot start recording - no authenticated user", category: .recording, level: .error)
             return
         }
         
-        // Create or update sleep event
-        if coreState.currentSleepEvent == nil {
-            let newSleepEvent = SleepEvent(id: sleepEventId)
-            coreState.currentSleepEvent = newSleepEvent
-            CoreLogger.shared.log("Created new sleep event \(sleepEventId)", category: .core, level: .info)
-        }
-        
-        // Generate subtag for this interval
-        let subtag = "sleep_interval_\(intervalNumber)"
+        // Log sleep interval start (event_id handled by DB trigger)
         
         recordingManager.startRecording(
             tag: .sleep,
-            duration: TimeInterval(intervalDuration), // Duration is already in minutes
+            duration: TimeInterval(intervalDuration * 60), // Convert minutes to seconds
             heartRatePublisher: bleManager.heartRatePublisher,
-            subtag: subtag,
-            sleepEventId: sleepEventId
+            isPaired: false,
+            intervalNumber: intervalNumber,
+            protocolName: nil
         )
+        
+        // Track interval number for next recording
+        coreState.currentSleepIntervalNumber = intervalNumber
     }
     
     func stopAutoRecording() {
-        // Stop current recording and end sleep event
+        // Stop current recording and end sleep session
         recordingManager.stopRecording()
         
-        if var sleepEvent = coreState.currentSleepEvent {
-            sleepEvent.end()
-            coreState.sleepEventHistory.append(sleepEvent)
-            coreState.currentSleepEvent = nil
-            
-            CoreLogger.shared.log("Ended sleep event \(sleepEvent.id) with \(sleepEvent.intervalCount) intervals", category: .core, level: .info)
-        }
+        // Log completion of sleep recording
+        CoreLogger.shared.log("Ended sleep recording with \(coreState.currentSleepIntervalNumber) intervals", category: .core, level: .info)
         
-        // Reset to single recording mode
-        coreState.recordingMode = .single(tag: .rest, duration: 7)
+        // Reset to single recording mode with canonical default
+        coreState.recordingMode = .single(tag: .wakeCheck, duration: 5)
+        coreState.currentSleepIntervalNumber = 1  // Reset for next sleep session
         CoreEvents.shared.emit(.autoRecordingStopped)
     }
     
@@ -297,27 +303,20 @@ class CoreEngine: ObservableObject {
             // Single recording completed - nothing special to do
             CoreLogger.shared.log("Single recording completed", category: .recording, level: .info)
             
-        case .autoRecording(let sleepEventId, let intervalDuration, let currentInterval):
-            // Sleep interval completed - update sleep event and automatically start next interval
-            if var sleepEvent = coreState.currentSleepEvent {
-                sleepEvent.addInterval()
-                coreState.currentSleepEvent = sleepEvent
-                
-                CoreEvents.shared.emit(.sleepIntervalCompleted(eventId: sleepEventId, intervalNumber: currentInterval))
-                CoreLogger.shared.log("Sleep interval \(currentInterval) completed for event \(sleepEventId)", category: .recording, level: .info)
-            }
+        case .autoRecording(let intervalDuration, let currentInterval, _):
+            // Sleep interval completed - automatically start next interval
+            CoreLogger.shared.log("Sleep interval \(currentInterval) completed", category: .recording, level: .info)
             
-            // Update recording mode for next interval and AUTO-START immediately
-            let nextInterval = currentInterval + 1
-            coreState.recordingMode = .autoRecording(sleepEventId: sleepEventId, intervalDuration: intervalDuration, currentInterval: nextInterval)
-            
-            CoreLogger.shared.log("Auto-starting sleep interval \(nextInterval) for event \(sleepEventId)", category: .recording, level: .info)
+            // Update recording mode for next interval
+            coreState.recordingMode = .autoRecording(intervalDuration: intervalDuration, currentInterval: currentInterval + 1, dbEventId: coreState.lastApiEventId)
+            coreState.currentSleepIntervalNumber = currentInterval + 1
+            CoreLogger.shared.log("Updated recording mode for next interval: \(currentInterval + 1)", category: .core, level: .info)
             
             // AUTOMATICALLY start the next interval immediately
             // This creates the continuous sleep recording flow: interval_1 → interval_2 → interval_3 → ...
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            Task { @MainActor in
                 if self.coreState.isInAutoRecordingMode {
-                    self.startSleepIntervalRecording(sleepEventId: sleepEventId, intervalDuration: intervalDuration, intervalNumber: nextInterval)
+                    self.startSleepIntervalRecording(intervalDuration: intervalDuration, intervalNumber: currentInterval + 1)
                 }
             }
         }
@@ -338,7 +337,14 @@ class CoreEngine: ObservableObject {
         CoreLogger.shared.log("Upload queue cleared", category: .queue, level: .warning)
     }
     
+    // MARK: - Session Processing
     func processCompletedSession(_ session: Session) {
+        // Store any event_id returned by the API for sleep sessions
+        if session.tag == SessionTag.sleep.rawValue {
+            // The API will return the DB-assigned event_id in the response
+            // We'll store it for reference but always send event_id=0 in uploads
+            CoreLogger.shared.log("Sleep session will receive event_id from DB trigger", category: .core, level: .info)
+        }
         queueManager.addSession(session)
         CoreEvents.shared.emit(.sessionQueued(sessionId: session.id))
     }
