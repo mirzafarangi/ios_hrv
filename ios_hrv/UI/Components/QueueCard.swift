@@ -10,7 +10,8 @@ struct QueueCard: View {
     @EnvironmentObject var coreEngine: CoreEngine
     @State private var showingDebugLog = false
     @State private var copiedToClipboard = false
-    @State private var selectedQueueItem: QueueItem?
+    // Store only the selected item's ID to avoid stale copies of the struct
+    @State private var selectedQueueItemId: String?
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -22,7 +23,7 @@ struct QueueCard: View {
                 
                 Spacer()
                 
-                if coreEngine.coreState.isUploading {
+                if coreEngine.coreState.queueStatus == .uploading {
                     ProgressView()
                         .scaleEffect(0.8)
                 }
@@ -47,7 +48,7 @@ struct QueueCard: View {
                 ForEach(coreEngine.coreState.queueItems) { item in
                     queueItemRow(item)
                         .onTapGesture {
-                            selectedQueueItem = item
+                            selectedQueueItemId = item.id
                             showingDebugLog = true
                         }
                 }
@@ -92,9 +93,11 @@ struct QueueCard: View {
             
             // Debug Log Panel or Session Report
             if showingDebugLog {
-                if let item = selectedQueueItem {
-                    sessionReportView(for: item)
+                if let liveItem = coreEngine.coreState.queueItems.first(where: { $0.id == selectedQueueItemId }) {
+                    // Always show session report for selected items
+                    sessionReportView(for: liveItem)
                 } else {
+                    // Show system logs only when no item is selected
                     debugLogView
                 }
             }
@@ -114,7 +117,7 @@ struct QueueCard: View {
                     .font(.headline)
                 Spacer()
                 Button(action: {
-                    selectedQueueItem = nil
+                    selectedQueueItemId = nil
                     showingDebugLog = false
                 }) {
                     Image(systemName: "xmark.circle.fill")
@@ -135,66 +138,114 @@ struct QueueCard: View {
                         if let validationReport = item.validationReport {
                             VStack(alignment: .leading, spacing: 4) {
                                 // Validation status
-                                if let validationResult = validationReport["validation_result"] as? [String: Any] {
-                                    HStack {
-                                        Text("Status:")
+                                HStack {
+                                    Text("Status:")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                    Text(validationReport.validationResult.isValid ? "✅ Valid" : "❌ Invalid")
+                                        .font(.caption)
+                                        .fontWeight(.medium)
+                                }
+                                
+                                // Show validation errors if present
+                                if !validationReport.validationResult.errors.isEmpty {
+                                    ForEach(validationReport.validationResult.errors, id: \.self) { error in
+                                        Text("❌ \(error)")
                                             .font(.caption)
-                                            .foregroundColor(.secondary)
-                                        Text(validationResult["is_valid"] as? Bool == true ? "✅ Valid" : "❌ Invalid")
+                                            .foregroundColor(.red)
+                                    }
+                                }
+                                
+                                // Show validation warnings if present
+                                if !validationReport.validationResult.warnings.isEmpty {
+                                    ForEach(validationReport.validationResult.warnings, id: \.self) { warning in
+                                        Text("⚠️ \(warning)")
                                             .font(.caption)
-                                            .fontWeight(.medium)
+                                            .foregroundColor(.orange)
                                     }
-                                    
-                                    // Duration details
-                                    if let details = validationResult["details"] as? [String: Any] {
-                                        if let durationIOS = details["duration_ios_minutes"] {
-                                            HStack {
-                                                Text("iOS Duration:")
-                                                    .font(.caption)
-                                                    .foregroundColor(.secondary)
-                                                Text("\(durationIOS) min")
-                                                    .font(.caption.monospaced())
-                                            }
-                                        }
-                                        if let durationCritical = details["duration_critical_minutes"] {
-                                            HStack {
-                                                Text("RR Duration:")
-                                                    .font(.caption)
-                                                    .foregroundColor(.secondary)
-                                                Text("\(durationCritical) min")
-                                                    .font(.caption.monospaced())
-                                            }
-                                        }
-                                        if let diff = details["duration_difference_seconds"] {
-                                            HStack {
-                                                Text("Difference:")
-                                                    .font(.caption)
-                                                    .foregroundColor(.secondary)
-                                                Text("\(diff)s")
-                                                    .font(.caption.monospaced())
-                                            }
-                                        }
-                                    }
-                                    
-                                    // Errors if any
-                                    if let errors = validationResult["errors"] as? [String], !errors.isEmpty {
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text("Errors:")
+                                }
+                                
+                                // Duration details
+                                HStack {
+                                    Text("iOS Duration:")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                    Text(String(format: "%.2f min", validationReport.durationAnalysis.iosDurationMinutes))
+                                        .font(.caption.monospaced())
+                                }
+                                HStack {
+                                    Text("RR Duration:")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                    Text(String(format: "%.2f min", validationReport.durationAnalysis.criticalDurationMinutes))
+                                        .font(.caption.monospaced())
+                                }
+                                HStack {
+                                    Text("Duration Match:")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                    Text(validationReport.durationAnalysis.durationMatch ? "✅" : "❌")
+                                        .font(.caption.monospaced())
+                                }
+                                
+                                // RR Analysis
+                                HStack {
+                                    Text("RR Count:")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                    Text("\(validationReport.rrAnalysis.rrCount)")
+                                        .font(.caption.monospaced())
+                                }
+                                
+                                // Errors if any
+                                if !validationReport.validationResult.errors.isEmpty {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("Errors:")
+                                            .font(.caption)
+                                            .foregroundColor(.red)
+                                        ForEach(validationReport.validationResult.errors, id: \.self) { error in
+                                            Text("• \(error)")
                                                 .font(.caption)
                                                 .foregroundColor(.red)
-                                            ForEach(errors, id: \.self) { error in
-                                                Text("• \(error)")
-                                                    .font(.caption)
-                                                    .foregroundColor(.red)
-                                            }
                                         }
                                     }
                                 }
+                                
+                                // Warnings if any
+                                if !validationReport.validationResult.warnings.isEmpty {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("Warnings:")
+                                            .font(.caption)
+                                            .foregroundColor(.orange)
+                                        ForEach(validationReport.validationResult.warnings, id: \.self) { warning in
+                                            Text("• \(warning)")
+                                                .font(.caption)
+                                                .foregroundColor(.orange)
+                                        }
+                                    }
+                                }
+                            }
+                        } else if item.status == .completed {
+                            Text("✅ Successfully uploaded (no validation report)")
+                                .font(.caption)
+                                .foregroundColor(.green)
+                        } else if item.status == .pending {
+                            Text("⏳ Pending upload")
+                                .font(.caption)
+                                .foregroundColor(.orange)
+                        } else if item.status == .uploading {
+                            HStack {
+                                ProgressView()
+                                    .scaleEffect(0.7)
+                                Text("Uploading...")
+                                    .font(.caption)
+                                    .foregroundColor(.blue)
                             }
                         } else {
                             Text("No validation report available")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
+                                .italic()
                         }
                     }
                     .padding(12)
@@ -219,22 +270,26 @@ struct QueueCard: View {
                                     .truncationMode(.middle)
                             }
                             
-                            HStack {
-                                Text("DB Status:")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                Text(item.dbStatus ?? "pending")
-                                    .font(.caption)
-                                    .fontWeight(.medium)
-                                    .foregroundColor(item.dbStatus == "saved" ? .green : .orange)
-                            }
-                            
-                            HStack {
-                                Text("Tag/Subtag:")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                Text("\(item.session.tag)/\(item.session.subtag)")
-                                    .font(.caption.monospaced())
+                            if let dbStatus = item.dbStatus {
+                                HStack {
+                                    Text("Status:")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                    Text(dbStatus)
+                                        .font(.caption.monospaced())
+                                        .fontWeight(.medium)
+                                        .foregroundColor(dbStatus.lowercased().contains("success") || dbStatus.lowercased().contains("stored") ? .green : .orange)
+                                }
+                            } else if item.status == .completed {
+                                HStack {
+                                    Text("Status:")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                    Text("✅ Stored in database")
+                                        .font(.caption)
+                                        .fontWeight(.medium)
+                                        .foregroundColor(.green)
+                                }
                             }
                             
                             HStack {
@@ -286,7 +341,7 @@ struct QueueCard: View {
                             .foregroundColor(.purple)
                         
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("URL: \(APIClient.shared.baseURL)/api/v1/sessions/upload")
+                            Text("URL: \(APIClient().baseURLString)/api/v1/sessions/upload")
                                 .font(.caption.monospaced())
                             Text("Method: POST")
                                 .font(.caption)
@@ -428,7 +483,7 @@ struct QueueCard: View {
     
     // MARK: - Helper Methods
     private func copySessionReport() {
-        guard let item = selectedQueueItem else { return }
+        guard let item = coreEngine.coreState.queueItems.first(where: { $0.id == selectedQueueItemId }) else { return }
         
         var report = "=== HRV SESSION REPORT ===\n\n"
         report += "Session ID: \(item.session.id)\n"
@@ -438,19 +493,27 @@ struct QueueCard: View {
         report += "RR Count: \(item.session.rrIntervals.count)\n"
         report += "Status: \(item.status.rawValue)\n"
         
-        if let validationReport = item.validationReport,
-           let validationResult = validationReport["validation_result"] as? [String: Any] {
+        if let validationReport = item.validationReport {
             report += "\n--- API VALIDATION ---\n"
-            report += "Valid: \(validationResult["is_valid"] as? Bool == true ? "Yes" : "No")\n"
-            if let details = validationResult["details"] as? [String: Any] {
-                report += "iOS Duration: \(details["duration_ios_minutes"] ?? "N/A") min\n"
-                report += "RR Duration: \(details["duration_critical_minutes"] ?? "N/A") min\n"
-                report += "Difference: \(details["duration_difference_seconds"] ?? "N/A")s\n"
-            }
-            if let errors = validationResult["errors"] as? [String], !errors.isEmpty {
+            report += "Valid: \(validationReport.validationResult.isValid ? "Yes" : "No")\n"
+            report += "iOS Duration: \(String(format: "%.2f", validationReport.durationAnalysis.iosDurationMinutes)) min\n"
+            report += "RR Duration: \(String(format: "%.2f", validationReport.durationAnalysis.criticalDurationMinutes)) min\n"
+            report += "Duration Match: \(validationReport.durationAnalysis.durationMatch ? "Yes" : "No")\n"
+            report += "Tolerance: \(validationReport.durationAnalysis.toleranceSeconds)s\n"
+            report += "RR Count: \(validationReport.rrAnalysis.rrCount)\n"
+            report += "Avg RR: \(String(format: "%.2f", validationReport.rrAnalysis.averageRRMs))ms\n"
+            
+            if !validationReport.validationResult.errors.isEmpty {
                 report += "Errors:\n"
-                for error in errors {
+                for error in validationReport.validationResult.errors {
                     report += "  • \(error)\n"
+                }
+            }
+            
+            if !validationReport.validationResult.warnings.isEmpty {
+                report += "Warnings:\n"
+                for warning in validationReport.validationResult.warnings {
+                    report += "  • \(warning)\n"
                 }
             }
         }
@@ -459,7 +522,7 @@ struct QueueCard: View {
         report += "DB Status: \(item.dbStatus ?? "pending")\n"
         
         report += "\n--- ENDPOINT ---\n"
-        report += "API: \(APIClient.shared.baseURL)/api/v1/sessions/upload\n"
+        report += "API: \(APIClient().baseURLString)/api/v1/sessions/upload\n"
         report += "Method: POST\n"
         
         UIPasteboard.general.string = report
@@ -520,34 +583,31 @@ struct QueueCard: View {
             return .green
         case .failed:
             return .red
+        @unknown default:
+            return .gray
         }
     }
     
     // MARK: - Computed Properties
     private var queueStatusColor: Color {
-        if coreEngine.coreState.hasFailedItems {
-            return .red
-        } else if coreEngine.coreState.isUploading {
-            return .blue
-        } else if coreEngine.coreState.hasQueuedItems {
-            return .orange
-        } else {
-            return .green
+        if coreEngine.coreState.hasFailedItems { return .red }
+        switch coreEngine.coreState.queueStatus {
+        case .uploading: return .blue
+        case .retrying: return .yellow
+        case .failed: return .red
+        case .idle:
+            return coreEngine.coreState.hasQueuedItems ? .orange : .green
         }
     }
     
     private var queueStatusText: String {
-        let count = coreEngine.coreState.queueItems.count
-        let failed = coreEngine.coreState.queueItems.filter { $0.status == .failed }.count
-        
-        if failed > 0 {
-            return "\(failed) failed, \(count - failed) pending"
-        } else if coreEngine.coreState.isUploading {
-            return "Uploading..."
-        } else if count > 0 {
-            return "\(count) items pending"
-        } else {
-            return "All uploaded"
-        }
+        let all = coreEngine.coreState.queueItems
+        let failed = all.filter { $0.status == .failed }.count
+        let uploading = all.filter { $0.status == .uploading }.count
+        let pending = all.filter { $0.status == .pending }.count
+        if failed > 0 { return "\(failed) failed, \(pending) pending" }
+        if coreEngine.coreState.queueStatus == .uploading || uploading > 0 { return "Uploading..." }
+        if !all.isEmpty { return "\(pending) pending" }
+        return "All uploaded"
     }
 }

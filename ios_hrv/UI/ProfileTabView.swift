@@ -143,13 +143,8 @@ struct ProfileTabView: View {
             Button("Cancel", role: .cancel) { }
             Button("Sign Out", role: .destructive) {
                 Task {
-                    do {
-                        try await authService.signOut()
-                        showingSuccessAlert = true
-                    } catch {
-                        print("Sign out error: \(error)")
-                        showingErrorAlert = true
-                    }
+                    await authService.signOut()
+                    showingSuccessAlert = true
                 }
             }
         } message: {

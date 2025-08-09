@@ -43,9 +43,11 @@ struct CoreState {
     // MARK: - Queue State
     var queueItems: [QueueItem] = []
     var queueStatus: QueueStatus = .idle
+    var isUploading: Bool = false
     
     // MARK: - UI State
     var debugMessages: [String] = []
+    var debugLogs: [String] = []  // For detailed debug logs
     var showingDebugLog: Bool = false
     
     // MARK: - Computed Properties
@@ -67,6 +69,14 @@ struct CoreState {
     
     var failedQueueItemCount: Int {
         return queueItems.filter { $0.status == .failed }.count
+    }
+    
+    var hasFailedItems: Bool {
+        return queueItems.contains { $0.status == .failed }
+    }
+    
+    var hasCompletedItems: Bool {
+        return queueItems.contains { $0.status == .completed }
     }
     
     // MARK: - Debug Helpers

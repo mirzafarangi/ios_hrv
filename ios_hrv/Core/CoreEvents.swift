@@ -20,6 +20,7 @@ enum CoreEvent {
     case recordingStopped
     case recordingCompleted(session: Session)
     case recordingFailed(error: String)
+    case recordingDiscarded(reason: String)
     
     // Recording Mode Events
     case recordingConfigurationChanged
@@ -105,6 +106,8 @@ class CoreEvents: ObservableObject {
             return "Recording completed: \(session.id)"
         case .recordingFailed(let error):
             return "Recording failed: \(error)"
+        case .recordingDiscarded(let reason):
+            return "Recording discarded: \(reason)"
             
         // Recording Mode Events
         case .recordingConfigurationChanged:

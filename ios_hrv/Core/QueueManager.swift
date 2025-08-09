@@ -61,8 +61,13 @@ class QueueManager: ObservableObject {
         queueItems.removeAll()
         saveQueueToStorage()
         queueStatus = .idle
-        
-        print("🗑️ Queue cleared")
+        logInfo("Queue cleared", category: .queue)
+    }
+    
+    func clearCompletedItems() {
+        queueItems.removeAll { $0.status == .completed }
+        saveQueueToStorage()
+        logInfo("Completed items cleared from queue", category: .queue)
     }
     
     func removeCompletedItems() {
@@ -111,8 +116,37 @@ class QueueManager: ObservableObject {
                 
                 await MainActor.run {
                     // Success - extract validation report and DB status from response
-                    if let validationReport = response["validation_report"] as? [String: Any] {
-                        self.queueItems[index].validationReport = validationReport
+                    if let validationReportDict = response["validation_report"] as? [String: Any] {
+                        // Parse the validation report dictionary into the ValidationReport struct
+                        if let validationResultDict = validationReportDict["validation_result"] as? [String: Any],
+                           let durationAnalysisDict = validationReportDict["duration_analysis"] as? [String: Any],
+                           let rrAnalysisDict = validationReportDict["rr_analysis"] as? [String: Any] {
+                            
+                            let validationResult = ValidationReport.ValidationResult(
+                                isValid: validationResultDict["is_valid"] as? Bool ?? false,
+                                errors: validationResultDict["errors"] as? [String] ?? [],
+                                warnings: validationResultDict["warnings"] as? [String] ?? []
+                            )
+                            
+                            let durationAnalysis = ValidationReport.DurationAnalysis(
+                                iosDurationMinutes: durationAnalysisDict["ios_duration_minutes"] as? Double ?? 0,
+                                criticalDurationMinutes: durationAnalysisDict["critical_duration_minutes"] as? Double ?? 0,
+                                durationMatch: durationAnalysisDict["duration_match"] as? Bool ?? false,
+                                toleranceSeconds: durationAnalysisDict["tolerance_seconds"] as? Int ?? 5
+                            )
+                            
+                            let rrAnalysis = ValidationReport.RRAnalysis(
+                                rrCount: rrAnalysisDict["rr_count"] as? Int ?? 0,
+                                totalDurationMs: rrAnalysisDict["total_duration_ms"] as? Double ?? 0,
+                                averageRRMs: rrAnalysisDict["average_rr_ms"] as? Double ?? 0
+                            )
+                            
+                            self.queueItems[index].validationReport = ValidationReport(
+                                validationResult: validationResult,
+                                durationAnalysis: durationAnalysis,
+                                rrAnalysis: rrAnalysis
+                            )
+                        }
                     }
                     if let dbStatus = response["db_status"] as? String {
                         self.queueItems[index].dbStatus = dbStatus
@@ -126,10 +160,8 @@ class QueueManager: ObservableObject {
                     logInfo("Upload successful: session_id=\(queueItem.session.id), db_status=\(self.queueItems[index].dbStatus ?? "unknown")", category: .api)
                     
                     // Log validation details if available
-                    if let validationReport = self.queueItems[index].validationReport,
-                       let validationResult = validationReport["validation_result"] as? [String: Any],
-                       let isValid = validationResult["is_valid"] as? Bool {
-                        logInfo("Validation result: valid=\(isValid)", category: .api)
+                    if let validationReport = self.queueItems[index].validationReport {
+                        logInfo("Validation result: valid=\(validationReport.validationResult.isValid)", category: .api)
                     }
                     
                     CoreEvents.shared.emit(.sessionUploadCompleted(sessionId: queueItem.session.id))

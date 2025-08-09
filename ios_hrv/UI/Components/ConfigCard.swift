@@ -16,8 +16,8 @@ struct ConfigCard: View {
             
             // Header
             HStack {
-                Image(systemName: "gear.circle.fill")
-                    .foregroundColor(.blue)
+                Image(systemName: coreEngine.coreState.isRecording ? "lock.circle.fill" : "gear.circle.fill")
+                    .foregroundColor(coreEngine.coreState.isRecording ? .orange : .blue)
                     .font(.title2)
                 
                 Text("Recording Configuration")
@@ -25,6 +25,17 @@ struct ConfigCard: View {
                     .fontWeight(.semibold)
                 
                 Spacer()
+                
+                if coreEngine.coreState.isRecording {
+                    Text("Locked")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundColor(.orange)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.orange.opacity(0.1))
+                        .cornerRadius(4)
+                }
             }
             
             // Tag Selection (Canonical - 4 tags only)
@@ -77,6 +88,7 @@ struct ConfigCard: View {
                     .background(Color(.systemGray6))
                     .cornerRadius(8)
                 }
+                .disabled(coreEngine.coreState.isRecording)
                 
                 // Tag Description
                 Text(coreEngine.coreState.selectedTag.description)
@@ -91,11 +103,12 @@ struct ConfigCard: View {
                 Toggle(isOn: $isPairedMode) {
                     HStack {
                         Image(systemName: "link")
-                            .foregroundColor(.blue)
+                            .foregroundColor(coreEngine.coreState.isRecording ? .gray : .blue)
                         Text("Paired Mode")
                             .font(.subheadline)
                     }
                 }
+                .disabled(coreEngine.coreState.isRecording)
                 .onChange(of: isPairedMode) { _, newValue in
                     coreEngine.updateRecordingConfiguration(
                         tag: coreEngine.coreState.selectedTag,
@@ -123,6 +136,7 @@ struct ConfigCard: View {
                     
                     TextField("Enter protocol name", text: $experimentProtocolName)
                         .textFieldStyle(RoundedBorderTextFieldStyle())
+                        .disabled(coreEngine.coreState.isRecording)
                         .onChange(of: experimentProtocolName) { _, newValue in
                             coreEngine.updateRecordingConfiguration(
                                 tag: coreEngine.coreState.selectedTag,
@@ -186,7 +200,8 @@ struct ConfigCard: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
-                .accentColor(.blue)
+                .accentColor(coreEngine.coreState.isRecording ? .gray : .blue)
+                .disabled(coreEngine.coreState.isRecording)
                 
                 // Duration hint for sleep mode
                 if coreEngine.coreState.selectedTag == .sleep {
@@ -215,6 +230,14 @@ struct ConfigCard: View {
         .background(Color(.systemBackground))
         .cornerRadius(12)
         .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
+        .overlay(
+            // Overlay to show recording is active
+            coreEngine.coreState.isRecording ?
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.black.opacity(0.05))
+                .allowsHitTesting(false)
+            : nil
+        )
     }
     
     // MARK: - Computed Properties

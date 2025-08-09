@@ -14,8 +14,8 @@ struct RecordTabView: View {
             ScrollView {
                 VStack(spacing: 16) {
                     
-                    // Sensor Connection Card
-                    SensorCard()
+                    // Sensor Connection Card (Minimal Academic Style)
+                    MinimalSensorCard()
                     
                     // Configuration Card
                     ConfigCard()

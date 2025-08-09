@@ -38,8 +38,8 @@ class RecordingManager: ObservableObject {
     // MARK: - Public Interface
     @MainActor
     func startRecording(
-        tag: SessionTag, 
-        duration: TimeInterval, 
+        tag: SessionTag,
+        durationMinutes: Int,
         heartRatePublisher: AnyPublisher<Int, Never>,
         isPaired: Bool = false,
         intervalNumber: Int? = nil,
@@ -51,7 +51,10 @@ class RecordingManager: ObservableObject {
         }
         
         logFlowStart("Recording Session", category: .recording)
-        logInfo("Session initiated: tag=\(tag.rawValue), duration=\(duration)s", category: .recording)
+        logInfo("Session initiated: tag=\(tag.rawValue), duration=\(durationMinutes)m", category: .recording)
+        
+        // Start auth persistence monitoring for long recordings
+        AuthPersistenceManager.shared.recordingDidStart()
         
         // Get authenticated user ID
         guard let userId = SupabaseAuthService.shared.userId else {
@@ -61,7 +64,7 @@ class RecordingManager: ObservableObject {
         
         // Setup recording state
         recordingTag = tag
-        recordingDuration = Int(duration)
+        recordingDuration = durationMinutes
         recordingStartTime = Date()
         heartRateData.removeAll()
         isRecording = true
@@ -83,27 +86,30 @@ class RecordingManager: ObservableObject {
             }
         
         // Create current session for UI display (Canonical compliant)
-        // Note: duration here is the CONFIGURED duration in MINUTES, will be updated with ACTUAL duration on stop
+        // Note: duration here is the CONFIGURED duration in MINUTES
         currentSession = Session(
             userId: userId,
             tag: tag.rawValue,              // Canonical tag as string
             subtag: currentSubtag,          // Generated canonical subtag
             eventId: 0,                     // ALWAYS 0 - DB trigger handles allocation
-            duration: Int(duration),        // Duration in MINUTES as per API/DB schema
+            duration: durationMinutes,      // Duration in MINUTES as per API/DB schema
             rrIntervals: []
         )
         
         // Setup timer for automatic stop
-        setupRecordingTimer(duration: Int(duration))
+        setupRecordingTimer(duration: durationMinutes)
         
         logFlowStep("Recording Session", step: "Event emission", category: .recording)
-        CoreEvents.shared.emit(.recordingStarted(tag: tag, duration: Int(duration)))
+        CoreEvents.shared.emit(.recordingStarted(tag: tag, duration: durationMinutes))
     }
-    
+    @MainActor
     func stopRecording(isAutoStop: Bool = false) {
         guard isRecording else { return }
         
         logInfo("Stopping recording (auto: \(isAutoStop))", category: .recording)
+        
+        // Stop auth persistence monitoring
+        AuthPersistenceManager.shared.recordingDidStop()
         
         // Cancel timers
         recordingTimer?.invalidate()

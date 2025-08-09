@@ -283,6 +283,32 @@ enum QueueItemStatus: String, Codable {
     }
 }
 
+// MARK: - Validation Report (Codable)
+struct ValidationReport: Codable {
+    struct ValidationResult: Codable {
+        let isValid: Bool
+        let errors: [String]
+        let warnings: [String]
+    }
+    
+    struct DurationAnalysis: Codable {
+        let iosDurationMinutes: Double
+        let criticalDurationMinutes: Double
+        let durationMatch: Bool
+        let toleranceSeconds: Int
+    }
+    
+    struct RRAnalysis: Codable {
+        let rrCount: Int
+        let totalDurationMs: Double
+        let averageRRMs: Double
+    }
+    
+    let validationResult: ValidationResult
+    let durationAnalysis: DurationAnalysis
+    let rrAnalysis: RRAnalysis
+}
+
 // MARK: - Queue Item
 struct QueueItem: Identifiable, Codable {
     let id: String
@@ -292,7 +318,7 @@ struct QueueItem: Identifiable, Codable {
     var lastAttemptAt: Date?
     var attemptCount: Int
     var errorMessage: String?
-    var validationReport: [String: Any]?
+    var validationReport: ValidationReport?
     var dbStatus: String?
     
     init(session: Session) {

@@ -8,6 +8,7 @@ import SwiftUI
 
 struct RecordingCard: View {
     @EnvironmentObject var coreEngine: CoreEngine
+    @State private var pulse: Bool = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -17,23 +18,14 @@ struct RecordingCard: View {
                 Image(systemName: "record.circle.fill")
                     .foregroundColor(coreEngine.coreState.isRecording ? .red : .gray)
                     .font(.title2)
-                
+                    .scaleEffect(coreEngine.coreState.isRecording && pulse ? 1.18 : 1.0)
+                    .animation(.easeInOut(duration: beatDuration()).repeatForever(autoreverses: true), value: pulse)
+
                 Text("Recording Session")
                     .font(.headline)
                     .fontWeight(.semibold)
                 
                 Spacer()
-                
-                if coreEngine.coreState.isRecording {
-                    Text("LIVE")
-                        .font(.caption)
-                        .fontWeight(.bold)
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color.red)
-                        .cornerRadius(4)
-                }
             }
             
             // Recording Status
@@ -192,25 +184,54 @@ struct RecordingCard: View {
                 }
             }
             
-            // Live Heart Rate
+            // Live HR/RR Metrics (single "Live" terminology)
             if coreEngine.coreState.currentHeartRate > 0 {
-                HStack {
+                HStack(spacing: 8) {
                     Image(systemName: "heart.fill")
                         .foregroundColor(.red)
                         .font(.subheadline)
-                    
+                        .scaleEffect(pulse ? 1.22 : 1.0)
+                        .animation(.easeInOut(duration: beatDuration()).repeatForever(autoreverses: true), value: pulse)
+
                     Text("Live HR:")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
-                    
                     Text("\(coreEngine.coreState.currentHeartRate) BPM")
                         .font(.subheadline)
                         .fontWeight(.semibold)
-                        .foregroundColor(.primary)
-                    
+
+                    Text("•")
+                        .foregroundColor(.secondary)
+
+                    Image(systemName: "waveform.path.ecg")
+                        .foregroundColor(.red)
+                        .font(.subheadline)
+                        .scaleEffect(pulse ? 1.22 : 1.0)
+                        .animation(.easeInOut(duration: beatDuration()).repeatForever(autoreverses: true), value: pulse)
+
+                    Text("Live RR:")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    Text(latestRRText())
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+
+                    if let count = coreEngine.coreState.currentSession?.rrIntervals.count {
+                        Text("(") + Text("\(count)").bold() + Text(" readings)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+
                     Spacer()
                 }
             }
+        }
+        .onChange(of: coreEngine.coreState.currentHeartRate) {
+            // retrigger animation when HR changes
+            if coreEngine.coreState.isRecording { pulse.toggle() }
+        }
+        .onAppear {
+            if coreEngine.coreState.isRecording { pulse = true }
         }
     }
     
@@ -319,6 +340,18 @@ struct RecordingCard: View {
         let minutes = seconds / 60
         let remainingSeconds = seconds % 60
         return String(format: "%d:%02d", minutes, remainingSeconds)
+    }
+    
+    private func latestRRText() -> String {
+        if let rr = coreEngine.coreState.currentSession?.rrIntervals.last {
+            return String(format: "%.0f ms", rr)
+        }
+        return "-- ms"
+    }
+    
+    private func beatDuration() -> Double {
+        let hr = max(30, min(200, coreEngine.coreState.currentHeartRate))
+        return hr > 0 ? (60.0 / Double(hr)) : 1.0
     }
     
     // MARK: - Helper Functions

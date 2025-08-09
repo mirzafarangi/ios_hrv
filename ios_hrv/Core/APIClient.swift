@@ -12,6 +12,11 @@ class APIClient {
     private let baseURL: URL
     private let urlSession: URLSession
     
+    // Public getter for baseURL (for UI display)
+    var baseURLString: String {
+        return baseURL.absoluteString
+    }
+    
     // MARK: - Endpoints
     private enum Endpoint {
         case uploadSession

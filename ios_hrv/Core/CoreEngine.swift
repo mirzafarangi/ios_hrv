@@ -153,7 +153,7 @@ class CoreEngine: ObservableObject {
     }
     
     func signOut() async throws {
-        try await authService.signOut()
+        await authService.signOut()
         CoreEvents.shared.emit(.userSignedOut)
     }
     
@@ -181,7 +181,7 @@ class CoreEngine: ObservableObject {
         
         recordingManager.startRecording(
             tag: tag,
-            duration: TimeInterval(duration * 60), // Convert minutes to seconds
+            durationMinutes: duration,
             heartRatePublisher: bleManager.heartRatePublisher,
             isPaired: coreState.isPairedMode,
             intervalNumber: tag == .sleep ? coreState.currentSleepIntervalNumber : nil,
@@ -252,7 +252,7 @@ class CoreEngine: ObservableObject {
         
         recordingManager.startRecording(
             tag: tag,
-            duration: TimeInterval(duration * 60), // Convert minutes to seconds
+            durationMinutes: duration,
             heartRatePublisher: bleManager.heartRatePublisher,
             isPaired: coreState.isPairedMode,
             intervalNumber: nil,
@@ -272,7 +272,7 @@ class CoreEngine: ObservableObject {
         
         recordingManager.startRecording(
             tag: .sleep,
-            duration: TimeInterval(intervalDuration * 60), // Convert minutes to seconds
+            durationMinutes: intervalDuration,
             heartRatePublisher: bleManager.heartRatePublisher,
             isPaired: false,
             intervalNumber: intervalNumber,
@@ -358,6 +358,11 @@ class CoreEngine: ObservableObject {
         queueManager.clearQueue()
         CoreEvents.shared.emit(.queueCleared)
         CoreLogger.shared.log("Queue cleared by user", category: .queue, level: .warning)
+    }
+    
+    func clearCompletedFromQueue() {
+        queueManager.clearCompletedItems()
+        CoreLogger.shared.log("Completed items cleared from queue", category: .queue, level: .info)
     }
     
     // MARK: - Session Processing (Simple Counter Only)
