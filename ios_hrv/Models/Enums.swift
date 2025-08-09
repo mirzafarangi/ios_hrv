@@ -289,24 +289,45 @@ struct ValidationReport: Codable {
         let isValid: Bool
         let errors: [String]
         let warnings: [String]
-    }
-    
-    struct DurationAnalysis: Codable {
-        let iosDurationMinutes: Double
-        let criticalDurationMinutes: Double
-        let durationMatch: Bool
-        let toleranceSeconds: Int
-    }
-    
-    struct RRAnalysis: Codable {
-        let rrCount: Int
-        let totalDurationMs: Double
-        let averageRRMs: Double
+        let details: [String: Any]?
+        
+        enum CodingKeys: String, CodingKey {
+            case isValid = "is_valid"
+            case errors
+            case warnings
+            case details
+        }
+        
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            isValid = try container.decode(Bool.self, forKey: .isValid)
+            errors = try container.decodeIfPresent([String].self, forKey: .errors) ?? []
+            warnings = try container.decodeIfPresent([String].self, forKey: .warnings) ?? []
+            details = nil // Skip decoding details as it's complex
+        }
+        
+        func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(isValid, forKey: .isValid)
+            try container.encode(errors, forKey: .errors)
+            try container.encode(warnings, forKey: .warnings)
+        }
+        
+        init(isValid: Bool, errors: [String], warnings: [String]) {
+            self.isValid = isValid
+            self.errors = errors
+            self.warnings = warnings
+            self.details = nil
+        }
     }
     
     let validationResult: ValidationResult
-    let durationAnalysis: DurationAnalysis
-    let rrAnalysis: RRAnalysis
+    let sessionSummary: [String: Any]?
+    
+    init(validationResult: ValidationResult, sessionSummary: [String: Any]? = nil) {
+        self.validationResult = validationResult
+        self.sessionSummary = sessionSummary
+    }
 }
 
 // MARK: - Queue Item

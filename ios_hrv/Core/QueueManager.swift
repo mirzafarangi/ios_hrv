@@ -117,34 +117,20 @@ class QueueManager: ObservableObject {
                 await MainActor.run {
                     // Success - extract validation report and DB status from response
                     if let validationReportDict = response["validation_report"] as? [String: Any] {
-                        // Parse the validation report dictionary into the ValidationReport struct
-                        if let validationResultDict = validationReportDict["validation_result"] as? [String: Any],
-                           let durationAnalysisDict = validationReportDict["duration_analysis"] as? [String: Any],
-                           let rrAnalysisDict = validationReportDict["rr_analysis"] as? [String: Any] {
+                        // Parse the simplified validation report from API
+                        if let validationResultDict = validationReportDict["validation_result"] as? [String: Any] {
                             
                             let validationResult = ValidationReport.ValidationResult(
-                                isValid: validationResultDict["is_valid"] as? Bool ?? false,
+                                isValid: validationResultDict["is_valid"] as? Bool ?? true,
                                 errors: validationResultDict["errors"] as? [String] ?? [],
                                 warnings: validationResultDict["warnings"] as? [String] ?? []
                             )
                             
-                            let durationAnalysis = ValidationReport.DurationAnalysis(
-                                iosDurationMinutes: durationAnalysisDict["ios_duration_minutes"] as? Double ?? 0,
-                                criticalDurationMinutes: durationAnalysisDict["critical_duration_minutes"] as? Double ?? 0,
-                                durationMatch: durationAnalysisDict["duration_match"] as? Bool ?? false,
-                                toleranceSeconds: durationAnalysisDict["tolerance_seconds"] as? Int ?? 5
-                            )
-                            
-                            let rrAnalysis = ValidationReport.RRAnalysis(
-                                rrCount: rrAnalysisDict["rr_count"] as? Int ?? 0,
-                                totalDurationMs: rrAnalysisDict["total_duration_ms"] as? Double ?? 0,
-                                averageRRMs: rrAnalysisDict["average_rr_ms"] as? Double ?? 0
-                            )
+                            let sessionSummary = validationReportDict["session_summary"] as? [String: Any]
                             
                             self.queueItems[index].validationReport = ValidationReport(
                                 validationResult: validationResult,
-                                durationAnalysis: durationAnalysis,
-                                rrAnalysis: rrAnalysis
+                                sessionSummary: sessionSummary
                             )
                         }
                     }

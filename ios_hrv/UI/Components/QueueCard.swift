@@ -165,36 +165,26 @@ struct QueueCard: View {
                                     }
                                 }
                                 
-                                // Duration details
-                                HStack {
-                                    Text("iOS Duration:")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                    Text(String(format: "%.2f min", validationReport.durationAnalysis.iosDurationMinutes))
-                                        .font(.caption.monospaced())
-                                }
-                                HStack {
-                                    Text("RR Duration:")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                    Text(String(format: "%.2f min", validationReport.durationAnalysis.criticalDurationMinutes))
-                                        .font(.caption.monospaced())
-                                }
-                                HStack {
-                                    Text("Duration Match:")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                    Text(validationReport.durationAnalysis.durationMatch ? "✅" : "❌")
-                                        .font(.caption.monospaced())
-                                }
-                                
-                                // RR Analysis
-                                HStack {
-                                    Text("RR Count:")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                    Text("\(validationReport.rrAnalysis.rrCount)")
-                                        .font(.caption.monospaced())
+                                // Session summary info (if available)
+                                if let summary = validationReport.sessionSummary {
+                                    if let duration = summary["duration_minutes"] as? Int {
+                                        HStack {
+                                            Text("Duration:")
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                            Text("\(duration) min")
+                                                .font(.caption.monospaced())
+                                        }
+                                    }
+                                    if let rrCount = summary["rr_interval_count"] as? Int {
+                                        HStack {
+                                            Text("RR Count:")
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                            Text("\(rrCount)")
+                                                .font(.caption.monospaced())
+                                        }
+                                    }
                                 }
                                 
                                 // Errors if any
@@ -494,14 +484,18 @@ struct QueueCard: View {
         report += "Status: \(item.status.rawValue)\n"
         
         if let validationReport = item.validationReport {
-            report += "\n--- API VALIDATION ---\n"
+            report += "\n--- VALIDATION ---\n"
             report += "Valid: \(validationReport.validationResult.isValid ? "Yes" : "No")\n"
-            report += "iOS Duration: \(String(format: "%.2f", validationReport.durationAnalysis.iosDurationMinutes)) min\n"
-            report += "RR Duration: \(String(format: "%.2f", validationReport.durationAnalysis.criticalDurationMinutes)) min\n"
-            report += "Duration Match: \(validationReport.durationAnalysis.durationMatch ? "Yes" : "No")\n"
-            report += "Tolerance: \(validationReport.durationAnalysis.toleranceSeconds)s\n"
-            report += "RR Count: \(validationReport.rrAnalysis.rrCount)\n"
-            report += "Avg RR: \(String(format: "%.2f", validationReport.rrAnalysis.averageRRMs))ms\n"
+            
+            // Add session summary info if available
+            if let summary = validationReport.sessionSummary {
+                if let duration = summary["duration_minutes"] as? Int {
+                    report += "Duration: \(duration) min\n"
+                }
+                if let rrCount = summary["rr_interval_count"] as? Int {
+                    report += "RR Count: \(rrCount)\n"
+                }
+            }
             
             if !validationReport.validationResult.errors.isEmpty {
                 report += "Errors:\n"
