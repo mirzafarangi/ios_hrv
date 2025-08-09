@@ -1,6 +1,6 @@
 /**
  * ios_hrvApp.swift
- * Main SwiftUI app entry point for HRV iOS App
+ * Main SwiftUI app entry point for Lumenis iOS App
  * Initializes CoreEngine and Supabase for clean dependency injection
  */
 
@@ -22,7 +22,7 @@ struct ios_hrvApp: App {
         configureApp()
         
         // Log app launch
-        logInfo("HRV App launched", category: .core)
+        logInfo("Lumenis App launched", category: .core)
         CoreEvents.shared.emit(.appLaunched)
     }
     
@@ -38,7 +38,7 @@ struct ios_hrvApp: App {
     // MARK: - Configuration
     private func configureApp() {
         // Configure logging
-        logInfo("Configuring HRV App...", category: .core)
+        logInfo("Configuring Lumenis App...", category: .core)
         
         // Any additional app-wide configuration can go here
         // For example: Firebase configuration, analytics, etc.

@@ -1,6 +1,6 @@
 /**
  * UnifiedModels.swift
- * Unified data models for HRV iOS App
+ * Unified data models for Lumenis iOS App
  * Ensures strict compliance with schema.md and clean Supabase integration
  */
 
@@ -75,8 +75,10 @@ struct Session: Codable, Identifiable {
     }
 }
 
-// MARK: - HRV Metrics Model (db_schema.sql Compliant - 9 Core Metrics)
-struct HRVMetrics: Codable {
+// MARK: - Physiological Metrics Model (db_schema.sql Compliant - 9 Core Metrics)
+struct PhysiologicalMetrics: Codable {
+    // Compatibility alias
+    typealias HRVMetrics = PhysiologicalMetrics
     let meanHr: Double?      // mean_hr DOUBLE PRECISION
     let meanRr: Double?      // mean_rr DOUBLE PRECISION
     let countRr: Int?        // rr_count INTEGER NOT NULL (note: DB uses rr_count, not count_rr)
@@ -125,7 +127,7 @@ struct ProcessedSession: Codable, Identifiable {
     let durationMinutes: Int     // duration_minutes INTEGER NOT NULL
     let recordedAt: Date         // recorded_at TIMESTAMPTZ NOT NULL
     let processedAt: Date?       // processed_at TIMESTAMPTZ (nullable)
-    let hrvMetrics: HRVMetrics   // All 9 metrics from DB
+    let hrvMetrics: PhysiologicalMetrics   // All 9 metrics from DB
     
     // Computed property for Identifiable protocol
     var id: String { sessionId }

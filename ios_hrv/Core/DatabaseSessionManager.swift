@@ -112,7 +112,7 @@ class DatabaseSessionManager: ObservableObject {
                         
                         self.debugInfo.append("📈 Session types: \(sessionTypes.joined(separator: ", "))")
                         self.debugInfo.append("✅ Completed: \(completedCount)/\(response.count)")
-                        self.debugInfo.append("📊 With HRV metrics: \(withMetricsCount)/\(response.count)")
+                        self.debugInfo.append("📊 With physiological metrics: \(withMetricsCount)/\(response.count)")
                     }
                 }
                 
@@ -337,7 +337,7 @@ struct DatabaseSession: Codable, Identifiable {
     let status: String
     let processedAt: Date?
     
-    // HRV Metrics (all 9 from final schema)
+    // Physiological Metrics (all 9 from final schema)
     let meanHr: Double?
     let meanRr: Double?
     let rmssd: Double?

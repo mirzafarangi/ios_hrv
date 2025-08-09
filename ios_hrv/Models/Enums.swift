@@ -1,6 +1,6 @@
 /**
  * Enums.swift
- * Shared enumerations for HRV iOS App
+ * Shared enumerations for Lumenis iOS App
  * Keeps logic consistent across components
  */
 
@@ -42,11 +42,11 @@ enum SessionTag: String, CaseIterable, Codable {
     var description: String {
         switch self {
         case .wakeCheck:
-            return "Morning wake check HRV measurement"
+            return "Morning wake check physiological measurement"
         case .preSleep:
-            return "Pre-sleep HRV measurement"
+            return "Pre-sleep physiological measurement"
         case .sleep:
-            return "Sleep HRV recording with auto-intervals"
+            return "Sleep physiological recording with auto-intervals"
         case .experiment:
             return "Experimental protocol measurement"
         }

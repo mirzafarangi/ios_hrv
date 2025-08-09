@@ -1,6 +1,6 @@
 /**
  * CoreEngine.swift
- * Master orchestrator for HRV iOS App
+ * Master orchestrator for Lumenis iOS App
  * Coordinates BLE, recording, queueing, and backend sync
  */
 

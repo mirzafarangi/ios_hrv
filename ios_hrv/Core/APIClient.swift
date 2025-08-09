@@ -1,6 +1,6 @@
 /**
  * APIClient.swift
- * API client for HRV iOS App
+ * API client for Lumenis iOS App
  * Communicates with Python backend via HTTP
  */
 
@@ -50,7 +50,7 @@ class APIClient {
     // MARK: - Initialization
     init() {
         // Configure base URL (production Railway deployment)
-        if let customURL = ProcessInfo.processInfo.environment["HRV_API_URL"] {
+        if let customURL = ProcessInfo.processInfo.environment["LUMENIS_API_URL"] {
             self.baseURL = URL(string: customURL)!
         } else {
             // Default to deployed Railway API
