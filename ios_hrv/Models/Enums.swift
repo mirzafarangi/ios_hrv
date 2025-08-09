@@ -324,6 +324,23 @@ struct ValidationReport: Codable {
     let validationResult: ValidationResult
     let sessionSummary: [String: Any]?
     
+    enum CodingKeys: String, CodingKey {
+        case validationResult = "validation_result"
+        case sessionSummary = "session_summary"
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        validationResult = try container.decode(ValidationResult.self, forKey: .validationResult)
+        sessionSummary = nil // Skip decoding sessionSummary as it's complex
+    }
+    
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(validationResult, forKey: .validationResult)
+        // Skip encoding sessionSummary
+    }
+    
     init(validationResult: ValidationResult, sessionSummary: [String: Any]? = nil) {
         self.validationResult = validationResult
         self.sessionSummary = sessionSummary
