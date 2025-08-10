@@ -77,7 +77,7 @@ class RecordingManager: ObservableObject {
             protocolName: protocolName
         )
         
-        logInfo("Generated canonical subtag: \(currentSubtag)", category: .recording)
+        logInfo("Generated canonical subtag: \(currentSubtag) | tag: \(tag.rawValue) | isPaired: \(isPaired)", category: .recording)
         
         // Subscribe to heart rate data
         heartRateSubscription = heartRatePublisher
@@ -202,6 +202,7 @@ class RecordingManager: ObservableObject {
             )
             
             logInfo("Recording completed: hr_readings=\(heartRateData.count), rr_intervals=\(heartRateData.count), actual_duration=\(actualDurationSeconds) s", category: .recording)
+            logInfo("Final session subtag: \(finalSession.subtag) for tag: \(finalSession.tag)", category: .recording)
             
             // Update state
             isRecording = false

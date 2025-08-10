@@ -96,8 +96,41 @@ class QueueManager: ObservableObject {
             return
         }
         
-        guard let index = queueItems.firstIndex(where: { $0.status == .pending }) else {
+        // Special handling for sleep intervals - must be uploaded in strict sequential order
+        let pendingIndices = queueItems.enumerated().compactMap { index, item in
+            item.status == .pending ? index : nil
+        }
+        
+        guard !pendingIndices.isEmpty else {
             print("ℹ️ No pending items to upload")
+            return
+        }
+        
+        // Find the next item to upload, prioritizing sleep intervals in order
+        var selectedIndex: Int? = nil
+        
+        // First, check if there are any pending sleep intervals
+        let pendingSleepIntervals = pendingIndices.compactMap { index -> (index: Int, intervalNumber: Int)? in
+            let item = queueItems[index]
+            if item.session.tag == "sleep",
+               let match = item.session.subtag.firstMatch(of: /sleep_interval_(\d+)/),
+               let intervalNum = Int(match.1) {
+                return (index: index, intervalNumber: intervalNum)
+            }
+            return nil
+        }.sorted { $0.intervalNumber < $1.intervalNumber }
+        
+        if !pendingSleepIntervals.isEmpty {
+            // Upload the sleep interval with the lowest interval number
+            selectedIndex = pendingSleepIntervals.first?.index
+            logInfo("Prioritizing sleep interval upload in sequential order", category: .queue)
+        } else {
+            // No sleep intervals, upload the first pending item
+            selectedIndex = pendingIndices.first
+        }
+        
+        guard let index = selectedIndex else {
+            print("ℹ️ No suitable item to upload")
             return
         }
         
@@ -166,33 +199,35 @@ class QueueManager: ObservableObject {
                 
             } catch {
                 await MainActor.run {
-                    // Failure
+                    // Check if this is an out-of-order sleep interval error
                     let errorMessage = error.localizedDescription
-                    logFlowError("Session Upload", error: errorMessage, category: .api)
-                    logError("Upload failed: session_id=\(queueItem.session.id), error=\(errorMessage)", category: .api)
+                    let isOutOfOrderError = errorMessage.contains("Out-of-order") || 
+                                           errorMessage.contains("out-of-order") ||
+                                           errorMessage.contains("sequentially")
                     
-                    if self.queueItems[index].attemptCount >= self.maxRetryAttempts {
-                        // Max retries reached
-                        self.queueItems[index].status = .failed
-                        self.queueItems[index].errorMessage = errorMessage
-                        self.queueStatus = .idle
-                        
-                        CoreEvents.shared.emit(.sessionUploadFailed(sessionId: queueItem.session.id, error: errorMessage))
-                        
-                    } else {
-                        // Retry later
+                    if isOutOfOrderError && queueItem.session.tag == "sleep" {
+                        // For out-of-order errors, mark as pending to retry later
+                        // This allows earlier intervals to be uploaded first
                         self.queueItems[index].status = .pending
-                        self.queueStatus = .idle
+                        self.queueItems[index].errorMessage = "Waiting for previous interval"
                         
-                        logInfo("Upload retry scheduled: session_id=\(queueItem.session.id), attempt=\(self.queueItems[index].attemptCount)/\(self.maxRetryAttempts)", category: .api)
-                        
-                        // Schedule retry
-                        DispatchQueue.main.asyncAfter(deadline: .now() + self.retryDelay) { @Sendable [weak self] in
-                            self?.uploadNextPendingItem()
-                        }
+                        logInfo("Sleep interval out of order, will retry after previous intervals", category: .queue)
+                    } else {
+                        // Other failures
+                        self.queueItems[index].status = .failed
+                        self.queueItems[index].errorMessage = error.localizedDescription
                     }
                     
+                    self.queueStatus = .idle
                     self.saveQueueToStorage()
+                    
+                    CoreEvents.shared.emit(.sessionUploadFailed(sessionId: queueItem.session.id, error: error.localizedDescription))
+                    
+                    logError("Upload failed: \(error.localizedDescription)", category: .api)
+                    logFlowStep("Session Upload", step: "Failed", category: .api)
+                    
+                    // Continue with next item
+                    self.uploadNextPendingItem()
                 }
             }
         }
