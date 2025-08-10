@@ -6,6 +6,63 @@
 
 import SwiftUI
 
+// MARK: - HRV Metric Category
+enum HRVMetricCategory {
+    case timeDomain
+    case frequencyNonlinear
+    case general
+    
+    var color: Color {
+        switch self {
+        case .timeDomain:
+            return .blue
+        case .frequencyNonlinear:
+            return .purple
+        case .general:
+            return .green
+        }
+    }
+}
+
+// MARK: - HRV Metric Row Component
+struct HRVMetricRow: View {
+    let label: String
+    let value: String
+    let unit: String
+    let category: HRVMetricCategory
+    
+    var body: some View {
+        HStack(spacing: 0) {
+            // Category indicator with consistent color
+            Circle()
+                .fill(category.color.opacity(0.6))
+                .frame(width: 6, height: 6)
+                .padding(.trailing, 10)
+            
+            // Label
+            Text(label)
+                .font(.system(size: 11, weight: .medium, design: .default))
+                .foregroundColor(.secondary)
+                .frame(width: 70, alignment: .leading)
+            
+            Spacer()
+            
+            // Value and unit
+            HStack(spacing: 4) {
+                Text(value)
+                    .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                    .foregroundColor(.primary)
+                
+                if !unit.isEmpty {
+                    Text(unit)
+                        .font(.system(size: 10, weight: .regular))
+                        .foregroundColor(.secondary)
+                }
+            }
+        }
+    }
+}
+
 // MARK: - Session Data Card
 struct SessionDataCard: View {
     let session: DatabaseSession
@@ -106,53 +163,177 @@ struct SessionDataCard: View {
             }
             .font(.caption)
             
-            // HRV Metrics Section
+            // HRV Metrics Section - Academic Scientific Design
             if session.hasHrvMetrics {
                 Divider()
+                    .padding(.vertical, 8)
                 
-                Text("HRV Metrics")
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 2), spacing: 8) {
-                    if let meanHr = session.meanHr {
-                        MetricView(title: "Mean HR", value: String(format: "%.1f bpm", meanHr), icon: "heart.fill")
-                    }
-                    
-                    if let rmssd = session.rmssd {
-                        MetricView(title: "RMSSD", value: String(format: "%.2f ms", rmssd), icon: "waveform.path.ecg")
-                    }
-                    
-                    if let sdnn = session.sdnn {
-                        MetricView(title: "SDNN", value: String(format: "%.2f ms", sdnn), icon: "chart.line.uptrend.xyaxis")
-                    }
-                    
-                    if let pnn50 = session.pnn50 {
-                        MetricView(title: "pNN50", value: String(format: "%.1f%%", pnn50), icon: "percent")
-                    }
-                    
-                    if let cvRr = session.cvRr {
-                        MetricView(title: "CV RR", value: String(format: "%.2f%%", cvRr), icon: "chart.bar")
-                    }
-                    
-                    if let defa = session.defa {
-                        MetricView(title: "DFA α1", value: String(format: "%.3f", defa), icon: "function")
-                    }
-                    
-                    if let sd2Sd1 = session.sd2Sd1 {
-                        MetricView(title: "SD2/SD1", value: String(format: "%.2f", sd2Sd1), icon: "circle.grid.cross")
-                    }
-                }
-            } else {
-                Divider()
-                
+                // Scientific Header
                 HStack {
-                    Image(systemName: "exclamationmark.triangle")
-                        .foregroundColor(.orange)
-                    Text("No HRV metrics available")
-                        .font(.caption)
+                    Text("HRV Metrics")
+                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .foregroundColor(.primary)
+                    
+                    Spacer()
+                    
+                    Text("Analysis")
+                        .font(.system(size: 11, weight: .medium))
                         .foregroundColor(.secondary)
                 }
+                .padding(.bottom, 12)
+                
+                // Metrics in Academic Layout - Primary Metrics
+                VStack(spacing: 0) {
+                    // Time Domain Header
+                    HStack {
+                        Rectangle()
+                            .fill(Color.blue.opacity(0.3))
+                            .frame(width: 3, height: 12)
+                        Text("TIME DOMAIN")
+                            .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                            .foregroundColor(.blue.opacity(0.8))
+                            .tracking(1.2)
+                        Spacer()
+                    }
+                    .padding(.bottom, 10)
+                    
+                    // Primary Time Domain Metrics (RMSSD, SDNN, pNN50)
+                    VStack(spacing: 10) {
+                        if let rmssd = session.rmssd {
+                            HRVMetricRow(
+                                label: "RMSSD",
+                                value: String(format: "%.2f", rmssd),
+                                unit: "ms",
+                                category: .timeDomain
+                            )
+                        }
+                        
+                        if let sdnn = session.sdnn {
+                            HRVMetricRow(
+                                label: "SDNN",
+                                value: String(format: "%.2f", sdnn),
+                                unit: "ms",
+                                category: .timeDomain
+                            )
+                        }
+                        
+                        if let pnn50 = session.pnn50 {
+                            HRVMetricRow(
+                                label: "pNN50",
+                                value: String(format: "%.1f", pnn50),
+                                unit: "%",
+                                category: .timeDomain
+                            )
+                        }
+                    }
+                    
+                    // Separator
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.1))
+                        .frame(height: 1)
+                        .padding(.vertical, 12)
+                    
+                    // Frequency & Nonlinear Header
+                    HStack {
+                        Rectangle()
+                            .fill(Color.purple.opacity(0.3))
+                            .frame(width: 3, height: 12)
+                        Text("FREQUENCY & NONLINEAR")
+                            .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                            .foregroundColor(.purple.opacity(0.8))
+                            .tracking(1.2)
+                        Spacer()
+                    }
+                    .padding(.bottom, 10)
+                    
+                    // Frequency & Nonlinear Metrics
+                    VStack(spacing: 10) {
+                        if let defa = session.defa {
+                            HRVMetricRow(
+                                label: "DFA α1",
+                                value: String(format: "%.3f", defa),
+                                unit: "",
+                                category: .frequencyNonlinear
+                            )
+                        }
+                        
+                        if let sd2Sd1 = session.sd2Sd1 {
+                            HRVMetricRow(
+                                label: "SD2/SD1",
+                                value: String(format: "%.2f", sd2Sd1),
+                                unit: "",
+                                category: .frequencyNonlinear
+                            )
+                        }
+                    }
+                    
+                    // Separator
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.1))
+                        .frame(height: 1)
+                        .padding(.vertical, 12)
+                    
+                    // General Metrics Header
+                    HStack {
+                        Rectangle()
+                            .fill(Color.green.opacity(0.3))
+                            .frame(width: 3, height: 12)
+                        Text("GENERAL")
+                            .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                            .foregroundColor(.green.opacity(0.8))
+                            .tracking(1.2)
+                        Spacer()
+                    }
+                    .padding(.bottom, 10)
+                    
+                    // General Metrics
+                    VStack(spacing: 10) {
+                        if let meanHr = session.meanHr {
+                            HRVMetricRow(
+                                label: "Mean HR",
+                                value: String(format: "%.1f", meanHr),
+                                unit: "bpm",
+                                category: .general
+                            )
+                        }
+                        
+                        if let rrCount = session.rrCount {
+                            HRVMetricRow(
+                                label: "RR Count",
+                                value: "\(rrCount)",
+                                unit: "",
+                                category: .general
+                            )
+                        }
+                        
+                        if let cvRr = session.cvRr {
+                            HRVMetricRow(
+                                label: "CV-RR",
+                                value: String(format: "%.2f", cvRr),
+                                unit: "%",
+                                category: .general
+                            )
+                        }
+                    }
+                }
+                .padding(.horizontal, 4)
+            } else {
+                Divider()
+                    .padding(.vertical, 8)
+                
+                VStack(spacing: 8) {
+                    Image(systemName: "waveform.path.ecg.rectangle")
+                        .font(.system(size: 24))
+                        .foregroundColor(.gray.opacity(0.5))
+                    Text("No HRV metrics available")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.secondary)
+                    Text("Insufficient RR intervals for analysis")
+                        .font(.system(size: 10))
+                        .foregroundColor(.gray.opacity(0.6))
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 20)
             }
             
             // Raw Data Info

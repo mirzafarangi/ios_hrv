@@ -56,51 +56,125 @@ struct QueueCard: View {
                 emptyQueueView
             }
             
-            // Action Buttons
-            HStack(spacing: 12) {
-                Button(action: {
-                    coreEngine.retryFailedUploads()
-                }) {
-                    Label("Retry", systemImage: "arrow.clockwise")
-                        .font(.caption)
-                        .fontWeight(.medium)
+            // Action Buttons - Clean Grid Layout
+            VStack(spacing: 10) {
+                HStack(spacing: 10) {
+                    // Retry Button
+                    Button(action: {
+                        coreEngine.retryFailedUploads()
+                    }) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.system(size: 14, weight: .medium))
+                            Text("Retry")
+                                .font(.system(size: 13, weight: .medium))
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(coreEngine.coreState.hasFailedItems ? 
+                                     Color.blue.opacity(0.1) : Color.gray.opacity(0.05))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .strokeBorder(coreEngine.coreState.hasFailedItems ? 
+                                            Color.blue.opacity(0.3) : Color.gray.opacity(0.2), 
+                                            lineWidth: 1)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!coreEngine.coreState.hasFailedItems)
+                    .opacity(coreEngine.coreState.hasFailedItems ? 1.0 : 0.5)
+                    
+                    // Clear Completed Button
+                    Button(action: {
+                        coreEngine.clearCompletedFromQueue()
+                    }) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "checkmark.circle")
+                                .font(.system(size: 14, weight: .medium))
+                            Text("Clear")
+                                .font(.system(size: 13, weight: .medium))
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(coreEngine.coreState.hasCompletedItems ? 
+                                     Color.gray.opacity(0.1) : Color.gray.opacity(0.05))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .strokeBorder(coreEngine.coreState.hasCompletedItems ? 
+                                            Color.gray.opacity(0.3) : Color.gray.opacity(0.2), 
+                                            lineWidth: 1)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!coreEngine.coreState.hasCompletedItems)
+                    .opacity(coreEngine.coreState.hasCompletedItems ? 1.0 : 0.5)
                 }
-                .buttonStyle(.bordered)
-                .disabled(!coreEngine.coreState.hasFailedItems)
                 
-                Button(action: {
-                    coreEngine.clearCompletedFromQueue()
-                }) {
-                    Label("Clear", systemImage: "trash")
-                        .font(.caption)
-                        .fontWeight(.medium)
+                HStack(spacing: 10) {
+                    // Clear All Button
+                    Button(action: {
+                        coreEngine.clearAllFromQueue()
+                    }) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "trash")
+                                .font(.system(size: 14, weight: .medium))
+                            Text("Clear All")
+                                .font(.system(size: 13, weight: .medium))
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(coreEngine.coreState.queueItems.isEmpty ? 
+                                     Color.gray.opacity(0.05) : Color.red.opacity(0.05))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .strokeBorder(coreEngine.coreState.queueItems.isEmpty ? 
+                                            Color.gray.opacity(0.2) : Color.red.opacity(0.3), 
+                                            lineWidth: 1)
+                        )
+                        .foregroundColor(coreEngine.coreState.queueItems.isEmpty ? .gray : .red)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(coreEngine.coreState.queueItems.isEmpty)
+                    .opacity(coreEngine.coreState.queueItems.isEmpty ? 0.5 : 1.0)
+                    
+                    // Logs Button
+                    Button(action: {
+                        showingDebugLog.toggle()
+                    }) {
+                        HStack(spacing: 6) {
+                            Image(systemName: showingDebugLog ? "doc.text.fill" : "doc.text")
+                                .font(.system(size: 14, weight: .medium))
+                            Text("Logs")
+                                .font(.system(size: 13, weight: .medium))
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(showingDebugLog ? 
+                                     Color.purple.opacity(0.1) : Color.gray.opacity(0.05))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .strokeBorder(showingDebugLog ? 
+                                            Color.purple.opacity(0.3) : Color.gray.opacity(0.2), 
+                                            lineWidth: 1)
+                        )
+                        .foregroundColor(showingDebugLog ? .purple : .primary)
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.bordered)
-                .disabled(!coreEngine.coreState.hasCompletedItems)
-                
-                Button(action: {
-                    coreEngine.clearAllFromQueue()
-                }) {
-                    Label("Clear All", systemImage: "trash.fill")
-                        .font(.caption)
-                        .fontWeight(.medium)
-                        .foregroundColor(.red)
-                }
-                .buttonStyle(.bordered)
-                .disabled(coreEngine.coreState.queueItems.isEmpty)
-                
-                Spacer()
-                
-                Button(action: {
-                    showingDebugLog.toggle()
-                }) {
-                    Label("Logs", systemImage: "doc.text.magnifyingglass")
-                        .font(.caption)
-                        .fontWeight(.medium)
-                }
-                .buttonStyle(.bordered)
             }
-            .padding(.top, 8)
+            .padding(.top, 12)
             
             // Debug Log Panel or Session Report
             if showingDebugLog {

@@ -33,18 +33,61 @@ struct SessionsTabView: View {
                 } else {
                     ScrollView {
                         LazyVStack(spacing: 24) {
-                            // Debug & Diagnostics Card - Shows true total count
-                            SessionDiagnosticsCard(
-                                totalCount: totalSessionCount,
-                                debugInfo: databaseSessionManager.debugInfo
-                            )
-                            
-                            // Expandable Accordion for Sessions by Tag
-                            SessionAccordionView(
-                                sessionsByTag: sessionsByTag,
-                                expandedSections: $expandedSections,
-                                onDelete: handleSessionDeletion
-                            )
+                            // Beautiful Header Band with Session Management
+                            VStack(spacing: 0) {
+                                // Header Band
+                                HStack {
+                                    // Left side - Session Management
+                                    HStack(spacing: 8) {
+                                        Image(systemName: "list.bullet.clipboard")
+                                            .font(.system(size: 16, weight: .semibold))
+                                            .foregroundColor(.blue)
+                                        Text("Session Management")
+                                            .font(.system(size: 16, weight: .semibold))
+                                            .foregroundColor(.primary)
+                                    }
+                                    
+                                    Spacer()
+                                    
+                                    // Right side - Total Sessions Count
+                                    HStack(spacing: 6) {
+                                        Text("Total:")
+                                            .font(.system(size: 14, weight: .medium))
+                                            .foregroundColor(.secondary)
+                                        Text("\(totalSessionCount)")
+                                            .font(.system(size: 18, weight: .bold, design: .rounded))
+                                            .foregroundColor(.blue)
+                                    }
+                                }
+                                .padding(.horizontal, 20)
+                                .padding(.vertical, 14)
+                                .background(
+                                    LinearGradient(
+                                        gradient: Gradient(colors: [
+                                            Color.blue.opacity(0.05),
+                                            Color.blue.opacity(0.02)
+                                        ]),
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
+                                .overlay(
+                                    Rectangle()
+                                        .frame(height: 1)
+                                        .foregroundColor(Color.blue.opacity(0.2)),
+                                    alignment: .bottom
+                                )
+                                
+                                // Expandable Accordion for Sessions by Tag
+                                SessionAccordionView(
+                                    sessionsByTag: sessionsByTag,
+                                    expandedSections: $expandedSections,
+                                    onDelete: handleSessionDeletion
+                                )
+                            }
+                            .background(Color(.secondarySystemBackground))
+                            .cornerRadius(12)
+                            .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
                             
                             // Latest Session Detail Card (if available)
                             if let latestSession = getLatestSession() {
