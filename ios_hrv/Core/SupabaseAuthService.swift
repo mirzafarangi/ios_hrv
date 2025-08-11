@@ -532,6 +532,11 @@ class SupabaseAuthService: ObservableObject {
         return userEmail ?? "Unknown User"
     }
     
+    func getCurrentUserId() async -> String? {
+        // Return the current user's ID if authenticated
+        return currentUser?.id
+    }
+    
     func clearMessages() {
         errorMessage = nil
         successMessage = nil

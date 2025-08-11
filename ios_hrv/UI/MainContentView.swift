@@ -22,8 +22,8 @@ struct MainContentView: View {
                             Text("Sessions")
                         }
                     
-                    // Trends Tab (formerly Charts)
-                    ChartsTabView()
+                    // Trends Tab (Baseline Analysis)
+                    TrendsTabView()
                         .tabItem {
                             Image(systemName: "chart.line.uptrend.xyaxis")
                             Text("Trends")

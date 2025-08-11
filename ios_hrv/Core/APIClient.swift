@@ -24,6 +24,7 @@ class APIClient {
         case rawSessions(String)
         case processedSessions(String)
         case sessionStatistics(String)
+        case baseline(userId: String, m: Int, n: Int, metrics: String, maxSessions: Int)
         case health
         case healthDetailed
         
@@ -39,6 +40,8 @@ class APIClient {
                 return "/api/v1/sessions/processed/\(userId)"
             case .sessionStatistics(let userId):
                 return "/api/v1/sessions/statistics/\(userId)"
+            case .baseline(let userId, let m, let n, let metrics, let maxSessions):
+                return "/api/v1/analytics/baseline?user_id=\(userId)&m=\(m)&n=\(n)&metrics=\(metrics)&max_sessions=\(maxSessions)"
             case .health:
                 return "/health"
             case .healthDetailed:
@@ -315,6 +318,68 @@ class APIClient {
         return try decoder.decode(SessionStatistics.self, from: data)
     }
     
+    // MARK: - Baseline Analytics
+    
+    func getBaselineAnalytics(
+        userId: String,
+        m: Int = 14,
+        n: Int = 7,
+        metrics: [String] = ["rmssd", "sdnn", "sd2_sd1", "mean_hr"],
+        maxSessions: Int = 300
+    ) async throws -> BaselineResponse {
+        // Construct metrics CSV string
+        let metricsCSV = metrics.joined(separator: ",")
+        
+        // Build endpoint with query parameters
+        let endpoint = Endpoint.baseline(
+            userId: userId,
+            m: m,
+            n: n,
+            metrics: metricsCSV,
+            maxSessions: maxSessions
+        )
+        
+        // Create full URL
+        guard let url = URL(string: endpoint.path, relativeTo: baseURL) else {
+            throw APIError.invalidURL
+        }
+        
+        print("📊 Baseline Analytics URL: \(url.absoluteString)")
+        
+        // Create request
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        await addAuthHeaders(to: &request)
+        
+        // Execute request
+        let (data, response) = try await urlSession.data(for: request)
+        
+        // Validate response
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.invalidResponse
+        }
+        
+        guard 200...299 ~= httpResponse.statusCode else {
+            let errorMessage = String(data: data, encoding: .utf8) ?? "Unknown error"
+            print("❌ Baseline API error: \(httpResponse.statusCode) - \(errorMessage)")
+            throw APIError.serverError(httpResponse.statusCode, errorMessage)
+        }
+        
+        // Decode response
+        let decoder = JSONDecoder()
+        do {
+            let baselineResponse = try decoder.decode(BaselineResponse.self, from: data)
+            print("✅ Baseline data received: \(baselineResponse.totalSessions) sessions, m=\(baselineResponse.mPointsRequested), n=\(baselineResponse.nPointsRequested)")
+            return baselineResponse
+        } catch {
+            print("❌ Failed to decode baseline response: \(error)")
+            if let jsonString = String(data: data, encoding: .utf8) {
+                print("Raw response: \(jsonString)")
+            }
+            throw APIError.decodingError(error)
+        }
+    }
+    
     func getHealthStatus() async throws -> HealthResponse {
         let endpoint = Endpoint.health
         let url = baseURL.appendingPathComponent(endpoint.path)
@@ -344,6 +409,7 @@ enum APIError: LocalizedError {
     case noData
     case serverError(Int, String)
     case networkError(Error)
+    case decodingError(Error)
     
     var errorDescription: String? {
         switch self {
@@ -357,6 +423,8 @@ enum APIError: LocalizedError {
             return "Server error (\(code)): \(message)"
         case .networkError(let error):
             return "Network error: \(error.localizedDescription)"
+        case .decodingError(let error):
+            return "Failed to decode response: \(error.localizedDescription)"
         }
     }
 }
